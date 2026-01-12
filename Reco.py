@@ -113,6 +113,12 @@ if __name__ == "__main__":
 
 	#sig = sig.Define("TheGenMuon_pt", "Ana::overflowProtected(GenPart_pt, GenDecay.mu)").Define("TheGenMuon_eta", "GenPart_eta[GenDecay.mu]").Define("TheGenMuon_phi", "GenPart_phi[GenDecay.mu]")
 
+	# Defining n-subjettiness ratios 
+	sig = sig.Define("{}_tau21".format("FatJet"), "{0}_tau2/{0}_tau1".format("FatJet"))
+	sig = sig.Define("{}_tau32".format("FatJet"), "{0}_tau3/{0}_tau2".format("FatJet"))
+
+
+
 	# TODO: try out taking the max from tauhtauh,tauhtaumu, tauhtaue
 	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xtauhtaum".format(anaConfig.tauIDvar)))
 
