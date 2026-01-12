@@ -15,6 +15,12 @@ else:
 from ROOT import Ana
 
 
+NanoAODversion = "v12"
+
+GloParTvar = { 	"v15" : "globalParT3", 
+				"v12": "globalParT" }
+
+
 data = "data" #"dataB2"
 
 dataWS = "dataDWS"
@@ -25,7 +31,7 @@ samples = [Sig, data, "B0toDstarDs", "B0toDstarDsstar", "B0toDstarD", "ButoDstar
 
 fitsamples = [Sig, "data_obs", "B0toDstarDs", "B0toDstarDsstar", "B0toDstarD", "ButoDstarDK", "ABCD"] #"B0toDstara1"
 
-tauIDvar = "globalParT3" #globalParT3_Xtauhtaum
+tauIDvar = GloParTvar[NanoAODversion] #globalParT3_Xtauhtaum
 
 regions = ["SR", "CR", "SB"]
 
