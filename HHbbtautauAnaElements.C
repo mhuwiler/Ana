@@ -1047,7 +1047,7 @@ namespace Ana
 			if (dz[i] > dzThres) continue; 
 			if (dxy[i] > dxyThres) continue; 
 			if (id[i] < idThres) continue; 
-			double dR = deltaR(eta[i], phi[i], jetEta, jetPhi); 
+			double dR = deltaR(eta[i], phi[i], jetEta, jetPhi); // ROOT::Math::VectorUtil::DeltaR(eta[i], phi[i], jetEta, jetPhi); 
 			if (dR > drThres) continue; 
 
 			muon = i;
@@ -1066,7 +1066,7 @@ namespace Ana
 		assert(mass.size() == nJets); 
 
 		// Muon selection requirements 
-		double ptThres = 20.; 
+		double ptThres = 200.; 
 		double etaThres = 2.4; 
 		double idThres = 0.2; 
 		
