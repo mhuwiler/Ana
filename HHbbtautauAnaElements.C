@@ -1005,6 +1005,69 @@ namespace Ana
 	}
 
 
+	int RecoMuon(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& dz, const ROOT::VecOps::RVec<float>& dxy) 
+	{
+		int n = pt.size(); 
+		assert(eta.size() == n); 
+		assert(phi.size() == n); 
+		assert(mass.size() == n); 
+
+		// Muon selection requirements 
+		double ptThres = 20.; 
+		double etaThres = 2.4; 
+		double dzThres = 0.2; 
+		double dxyThres = 0.045; 
+		double idThres = 0.2; 
+
+
+		int muon = -999.; 
+
+		for (unsigned int i=0; i<n; i++) 
+		{
+			if (pt[i] < ptThres) continue; 
+			if (eta[i] > etaThres) continue; 
+			if (dz[i] > dzThres) continue; 
+			if (dxy[i] > dxyThres) continue; 
+			if (id[i] < idThres) continue; 
+
+			muon = i;
+			break; 
+		}
+
+		return muon; 
+	}
+
+
+	int RecoTauJet(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& id) 
+	{
+		int nJets = pt.size(); 
+		assert(eta.size() == nJets); 
+		assert(phi.size() == nJets); 
+		assert(mass.size() == nJets); 
+
+		// Muon selection requirements 
+		double ptThres = 20.; 
+		double etaThres = 2.4; 
+		double idThres = 0.2; 
+		
+
+
+		int tauJet = -999.; 
+
+		for (unsigned int i=0; i<nJets; i++) 
+		{
+			if (pt[i] < ptThres) continue; 
+			if (eta[i] > etaThres) continue; 
+			if (id[i] < idThres) continue; 
+
+			tauJet = i;
+			break; 
+		}
+
+		return tauJet; 
+	}
+
+
 
 	void AddColumn(ROOT::RDF::RNode* df, const std::string &newColName) {
     	*df = df->Define(newColName, [](){ return 42; });
