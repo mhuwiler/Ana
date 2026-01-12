@@ -126,14 +126,18 @@ if __name__ == "__main__":
 	sig = sig.Define("TheRecoMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_phi, {0}_tightId, {0}_dz, {0}_dxy, {1}_eta, {1}_phi)".format("Muon", "TheTauFatJet"))
 
 	# Constructing normalised discriminators
-	sig = sig.Define("{}_{}_QCD".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_QCD0HF+{0}_{1}_QCD0HF+{0}_{1}_QCD0HF".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("{}_{}_QCD".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_QCD0HF+{0}_{1}_QCD1HF+{0}_{1}_QCD2HF".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("{}_{}_Top".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_TopbW+{0}_{1}_TopW".format("FatJet", anaConfig.tauIDvar))
 	sig = sig.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD)".format("FatJet", anaConfig.tauIDvar))
 	sig = sig.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtaum/({0}_{1}_QCD+{0}_{1}_Xtauhtaum)".format("FatJet", anaConfig.tauIDvar))
 	sig = sig.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtaue/({0}_{1}_QCD+{0}_{1}_Xtauhtaue)".format("FatJet", anaConfig.tauIDvar))
 
-	sig = sig.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD+{0}_{1}_TopbW)".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaum/({0}_{1}_Xtauhtaum+{0}_{1}_QCD+{0}_{1}_TopbW)".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaue/({0}_{1}_Xtauhtaue+{0}_{1}_QCD+{0}_{1}_TopbW)".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaum/({0}_{1}_Xtauhtaum+{0}_{1}_QCD+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaue/({0}_{1}_Xtauhtaue+{0}_{1}_QCD+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
+
+	sig = sig.Define("{}_{}_Xbb{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xbb/({0}_{1}_QCD+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("{}_{}_Xbb{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xbb/({0}_{1}_QCD+{0}_{1}_Xbb+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
 
 
 	sig = sig.Define("ThebFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xbb".format(anaConfig.tauIDvar)))
