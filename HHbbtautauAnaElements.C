@@ -1005,7 +1005,24 @@ namespace Ana
 	}
 
 
-	int RecoMuon(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& dz, const ROOT::VecOps::RVec<float>& dxy, const float jetPt, const float jetEta) 
+	inline double deltaPhi(double phi1, double phi2)
+	{
+	    double dphi = phi1 - phi2;
+	    while (dphi >  M_PI) dphi -= 2.0 * M_PI;
+	    while (dphi <= -M_PI) dphi += 2.0 * M_PI;
+	    return dphi;
+	}
+
+
+	inline double deltaR(double eta1, double phi1, double eta2, double phi2)
+	{
+	    const double dEta = eta1 - eta2;
+	    const double dPhi = deltaPhi(phi1, phi2);
+	    return std::sqrt(dEta * dEta + dPhi * dPhi);
+	}
+
+
+	int RecoMuon(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& dz, const ROOT::VecOps::RVec<float>& dxy, const float jetEta, const float jetPhi) 
 	{ // TODO: add tau jet eta phi (single float)
 		int n = pt.size(); 
 		assert(eta.size() == n); 
@@ -1018,8 +1035,7 @@ namespace Ana
 		double dzThres = 0.2; 
 		double dxyThres = 0.045; 
 		double idThres = 0.2; 
-
-		// TODO: add function to compute dR from eta and phi
+		double drThres = 1.5; 
 
 
 		int muon = -999.; 
@@ -1031,6 +1047,8 @@ namespace Ana
 			if (dz[i] > dzThres) continue; 
 			if (dxy[i] > dxyThres) continue; 
 			if (id[i] < idThres) continue; 
+			double dR = deltaR(eta[i], phi[i], jetEta, jetPhi); 
+			if (dR > drThres) continue; 
 
 			muon = i;
 			break; 

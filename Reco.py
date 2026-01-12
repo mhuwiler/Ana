@@ -116,7 +116,7 @@ if __name__ == "__main__":
 	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xtauhtaum".format(anaConfig.tauIDvar)))
 
 	sig = sig.Define("TheTauFatJet_eta", "Ana::overflowProtected(FatJet_eta, TheTauFatJet)").Define("TheTauFatJet_phi", "Ana::overflowProtected(FatJet_phi, TheTauFatJet)")
-	sig = sig.Define("TheRecoMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_tightId, {0}_dz, {0}_dxy, {1}_eta, {1}_phi)".format("Muon", "TheTauFatJet"))
+	sig = sig.Define("TheRecoMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_phi, {0}_tightId, {0}_dz, {0}_dxy, {1}_eta, {1}_phi)".format("Muon", "TheTauFatJet"))
 
 	# Constructing normalised discriminators
 	sig = sig.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD0HF)".format("FatJet", anaConfig.tauIDvar))
