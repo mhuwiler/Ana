@@ -113,6 +113,7 @@ if __name__ == "__main__":
 
 	#sig = sig.Define("TheGenMuon_pt", "Ana::overflowProtected(GenPart_pt, GenDecay.mu)").Define("TheGenMuon_eta", "GenPart_eta[GenDecay.mu]").Define("TheGenMuon_phi", "GenPart_phi[GenDecay.mu]")
 
+	# TODO: try out taking the max from tauhtauh,tauhtaumu, tauhtaue
 	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xtauhtaum".format(anaConfig.tauIDvar)))
 
 	sig = sig.Define("TheTauFatJet_eta", "Ana::overflowProtected(FatJet_eta, TheTauFatJet)").Define("TheTauFatJet_phi", "Ana::overflowProtected(FatJet_phi, TheTauFatJet)")
@@ -127,6 +128,10 @@ if __name__ == "__main__":
 	sig = sig.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaum/({0}_{1}_Xtauhtaum+{0}_{1}_QCD0HF+{0}_{1}_TopbW)".format("FatJet", anaConfig.tauIDvar))
 	sig = sig.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaue/({0}_{1}_Xtauhtaue+{0}_{1}_QCD0HF+{0}_{1}_TopbW)".format("FatJet", anaConfig.tauIDvar))
 
+
+	sig = sig.Define("ThebFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xbb".format(anaConfig.tauIDvar)))
+
+	sig = sig.Filter("(TheTauFatJet!=ThebFatJet)") # removing overlap between bb and tautau jets
 
 	gensig = sig.Define("GenDecay", "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)".format("GenPart"))
 
