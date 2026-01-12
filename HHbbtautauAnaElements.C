@@ -1005,8 +1005,8 @@ namespace Ana
 	}
 
 
-	int RecoMuon(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& dz, const ROOT::VecOps::RVec<float>& dxy) 
-	{
+	int RecoMuon(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& dz, const ROOT::VecOps::RVec<float>& dxy, const float jetPt, const float jetEta) 
+	{ // TODO: add tau jet eta phi (single float)
 		int n = pt.size(); 
 		assert(eta.size() == n); 
 		assert(phi.size() == n); 
@@ -1018,6 +1018,8 @@ namespace Ana
 		double dzThres = 0.2; 
 		double dxyThres = 0.045; 
 		double idThres = 0.2; 
+
+		// TODO: add function to compute dR from eta and phi
 
 
 		int muon = -999.; 
