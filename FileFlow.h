@@ -72,50 +72,16 @@ namespace Ana
 
 		Int_t nBins = 50; 
 
-		if (!denominator) 
-		{
-			binning = {{"Electron_pt", {"", "e p_{T};e p_{T} [GeV];Counts", nBins, 0., 30.}},
-				{"Electron_eta", {"", "e #eta;e #eta;Counts", nBins, -3.15, 3.15}},
-				{"Electron_phi", {"", "e #phi; e #phi;Counts", nBins, -3.5, 3.5}},
-				{"Muon_pt", {"", "#mu p_{T};#mu p_{T} [GeV];Counts", nBins, 0., 50.}},
-				{"Muon_eta", {"", "#mu #eta;#mu #eta;Counts", nBins, -3.15, 3.15}},
-				{"Muon_phi", {"", "#mu #phi; #mu #phi;Counts", nBins, -3.5, 3.5}},
-			}; 
-		}
-		else // denominator
-		{
-			nBins = 50;
-			std::vector<double> bins = {4.5, 4.6, 4.7, 4.8, 4.9, 5., 5.07, 5.15, 5.2, 5.21, 5.22, 5.23, 5.24, 5.25, 5.26, 5.27, 5.28, 5.29, 5.3, 5.31, 5.32, 5.33, 5.34, 5.35, 5.36, 5.37, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.};
-			binning = {{"b_tau_rhomass1", {"", "#rho_{12} mass;Invariant m_{#rho} [GeV];Counts", nBins, 0., 1.5}},
-				{"b_tau_rhomass2", {"", "rho_{23} mass;Invariant m_{#rho} [GeV];Counts", nBins, 0., 1.5}},
-				//{"b_B_m", {"", "B mass;Reconstructed m_{B} [GeV];Counts", nBins, 4.5, 6.}},
-				{"b_B_m", {"", "B mass;Reconstructed m_{B} [GeV];Counts", static_cast<int>(bins.size()-1), bins.data()}},
-				{"b_B_q2", {"", "q2;q^{2} [GeV];Counts", nBins, 0., 12.}},
-				{"b_tau_m", {"", "\tau mass;Reconstructed m_{#tau} [GeV];Counts", nBins, 1., 3.}},
-				//{"B_m", {"", ";B mass [GeV];Counts", nBins, 0., 6.}},
-				//{"B_q2", {"", ";B mass [GeV];Counts", nBins, 0., 12.}},
-				//{"tau_rhomass1", {"", ";#rho_{12} mass [GeV];Counts", nBins, 0., 1.5}},
-				//{"tau_rhomass2", {"", ";#rho_{12} mass [GeV];Counts", nBins, 0., 1.5}},
-				{"b_B_proper_xi_rho1", {"", "#tau mass;Reconstructed m_{#tau} [GeV];Counts", nBins, -1.1, 1.1}},
-				{"b_B_proper_xi_rho2", {"", "#tau mass;Reconstructed m_{#tau} [GeV];Counts", nBins, -1.1, 1.1}},
-				{"b_tau_proper_alpha_rho1_pi", {"", "#tau mass;Reconstructed m_{#tau} [GeV];Counts", nBins, -1.1, 1.1}},
-				{"b_tau_proper_alpha_rho2_pi", {"", "#tau mass;Reconstructed m_{#tau} [GeV];Counts", nBins, -1.1, 1.1}},
-				{"b_tau_proper_theta_rho1", {"", "#tau mass;Reconstructed m_{#tau} [GeV];Counts", nBins, -1.1, 1.1}},
-				{"b_tau_proper_theta_rho2", {"", "#tau mass;Reconstructed m_{#tau} [GeV];Counts", nBins, -1.1, 1.1}},
-			}; 
-		}
+		// binning = {}; // Can add here custom binning that override VariableDefinitions.ccf 
 
 		// Complete binning with default
 		std::unordered_map<std::string, ROOT::RDF::TH1DModel> defaultbinning = { 
 			#include "VariableDefinitions.ccf" 
 		}; 
 
-		std::vector<std::string> excluded; 
-		if (denominator) 
-		{
-			excluded = {"b_tau_dnn1", "b_tau_dnn2","b_tau_dnn3","b_tau_sumdnn"};
-		}
+		std::vector<std::string> excluded; // Can exlude variables from VariableDefinitions.ccf to be added to binning
 
+		
 		for (auto item : defaultbinning) 
 		{
 			if ((binning.find(item.first) == binning.end()) && (std::find(excluded.begin(), excluded.end(), item.first) == excluded.end())) 
@@ -125,15 +91,6 @@ namespace Ana
 		}
 
 		samples = InitSamples(); 
-
-		// Filling the versions of final MVA discriminator
-		FinalBDT = {	
-			{"v6.9", "./anaMVA/MVAinSBdata/model_optimized/weights.xml"}, //LatestVsData
-			{"v6.95", "./anaMVA/MVAinSBdata/model_optimized/weights.xml"} //LatestVsData
-		}; 
-
-		//if (regions != "") LoadRegions(regions); 
-
 	}
 
 
@@ -142,535 +99,43 @@ namespace Ana
 		if (cycle != "") // For legacy purpose 
 		{
 
-			folder = "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/"+cycle+"/"; 
-			folderbase = "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/";
-
-			filemanager.AddItem("Sig_ntuple", folder+"Sig.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Sig_tf", folder+"Sig_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Sig_DNN", folder+"Sig_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Sig", folder+"Sig_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("SigTrain_ntuple", folder+"SigTrain.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigTrain_tf", folder+"SigTrain_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigTrain_DNN", folder+"SigTrain_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigTrain", folder+"SigTrain_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("SigTest_ntuple", folder+"SigTest.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigTest_tf", folder+"SigTest_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigTest_DNN", folder+"SigTest_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigTest", folder+"SigTest_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("SigPart_ntuple", folder+"SignalOfficialMC100MTestNoGenMatch.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigPart_tf", folder+"SignalOfficialMC100MTestNoGenMatch_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigPart_DNN", folder+"SignalOfficialMC100MTestNoGenMatch_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigPart", folder+"SignalOfficialMC100MTestNoGenMatch_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("BkgDstarDs_ntuple", folder+"BkgDstarDs.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDs_tf", folder+"BkgDstarDs_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDs_DNN", folder+"BkgDstarDs_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDs", folder+"BkgDstarDs_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("BkgDstarDsPart_ntuple", folder+"BkgDstarDsPart.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDsPart_tf", folder+"BkgDstarDsPart_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDsPart_DNN", folder+"BkgDstarDsPart_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDsPart", folder+"BkgDstarDsPart_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("BkgDstarDsstar_ntuple", folder+"BkgDstarDsstar.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDsstar_tf", folder+"BkgDstarDsstar_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDsstar_DNN", folder+"BkgDstarDsstar_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDsstar", folder+"BkgDstarDsstar_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarDs_ntuple", folder+"B0toDstarDs.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDs_tf", folder+"B0toDstarDs_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDs_DNN", folder+"B0toDstarDs_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDs", folder+"B0toDstarDs_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarDsstar_ntuple", folder+"B0toDstarDsstar.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsstar_tf", folder+"B0toDstarDsstar_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsstar_DNN", folder+"B0toDstarDsstar_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsstar", folder+"B0toDstarDsstar_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarD_ntuple", folder+"B0toDstarD.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarD_tf", folder+"B0toDstarD_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarD_DNN", folder+"B0toDstarD_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarD", folder+"B0toDstarD_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarDs1_ntuple", folder+"B0toDstarDs1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDs1_tf", folder+"B0toDstarDs1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDs1_DNN", folder+"B0toDstarDs1_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDs1", folder+"B0toDstarDs1_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarDs0star_ntuple", folder+"B0toDstarDs0star.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDs0star_tf", folder+"B0toDstarDs0star_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDs0star_DNN", folder+"B0toDstarDs0star_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDs0star", folder+"B0toDstarDs0star_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarD0K_ntuple", folder+"B0toDstarD0K.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarD0K_tf", folder+"B0toDstarD0K_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarD0K_DNN", folder+"B0toDstarD0K_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarD0K", folder+"B0toDstarD0K_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarD0Kstar_ntuple", folder+"B0toDstarD0Kstar.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarD0Kstar_tf", folder+"B0toDstarD0Kstar_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarD0Kstar_DNN", folder+"B0toDstarD0Kstar_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarD0Kstar", folder+"B0toDstarD0Kstar_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDDtoTau_ntuple", folder+"B0toDDtoTau.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDDtoTau_tf", folder+"B0toDDtoTau_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDDtoTau_DNN", folder+"B0toDDtoTau_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDDtoTau", folder+"B0toDDtoTau_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstara1_ntuple", folder+"B0toDstara1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstara1_tf", folder+"B0toDstara1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstara1_DNN", folder+"B0toDstara1_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstara1", folder+"B0toDstara1_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstar3pi_ntuple", folder+"B0toDstar3pi.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstar3pi_tf", folder+"B0toDstar3pi_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstar3pi_DNN", folder+"B0toDstar3pi_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstar3pi", folder+"B0toDstar3pi_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarrho0pi_ntuple", folder+"B0toDstarrho0pi.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarrho0pi_tf", folder+"B0toDstarrho0pi_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarrho0pi_DNN", folder+"B0toDstarrho0pi_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarrho0pi", folder+"B0toDstarrho0pi_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstar3pipi0_ntuple", folder+"B0toDstar3pipi0.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstar3pipi0_tf", folder+"B0toDstar3pipi0_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstar3pipi0_DNN", folder+"B0toDstar3pipi0_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstar3pipi0", folder+"B0toDstar3pipi0_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstar5pi_ntuple", folder+"B0toDstar5pi.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstar5pi_tf", folder+"B0toDstar5pi_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstar5pi_DNN", folder+"B0toDstar5pi_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstar5pi", folder+"B0toDstar5pi_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarKpipi_ntuple", folder+"B0toDstarKpipi.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarKpipi_tf", folder+"B0toDstarKpipi_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarKpipi_DNN", folder+"B0toDstarKpipi_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarKpipi", folder+"B0toDstarKpipi_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarKKstar_ntuple", folder+"B0toDstarKKstar.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarKKstar_tf", folder+"B0toDstarKKstar_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarKKstar_DNN", folder+"B0toDstarKKstar_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarKKstar", folder+"B0toDstarKKstar_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("ButoDstarpipipipi0_ntuple", folder+"ButoDstarpipipipi0.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarpipipipi0_tf", folder+"ButoDstarpipipipi0_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarpipipipi0_DNN", folder+"ButoDstarpipipipi0_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarpipipipi0", folder+"ButoDstarpipipipi0_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("ButoDstarpipipi_ntuple", folder+"ButoDstarpipipi.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarpipipi_tf", folder+"ButoDstarpipipi_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarpipipi_DNN", folder+"ButoDstarpipipi_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarpipipi", folder+"ButoDstarpipipi_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("ButoDstarpipipi0_ntuple", folder+"ButoDstarpipipi0.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarpipipi0_tf", folder+"ButoDstarpipipi0_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarpipipi0_DNN", folder+"ButoDstarpipipi0_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarpipipi0", folder+"ButoDstarpipipi0_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarDsX_ntuple", folder+"B0toDstarDsX.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsX_tf", folder+"B0toDstarDsX_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsX_DNN", folder+"B0toDstarDsX_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsX", folder+"B0toDstarDsX_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarRho0pi_ntuple", folder+"B0toDstarRho0pi.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarRho0pi_tf", folder+"B0toDstarRho0pi_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarRho0pi_DNN", folder+"B0toDstarRho0pi_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarRho0pi", folder+"B0toDstarRho0pi_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarDsPart_ntuple", folder+"B0toDstarDsTestPart.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsPart_tf", folder+"B0toDstarDsTestPart_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsPart_DNN", folder+"B0toDstarDsTestPart_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsPart", folder+"B0toDstarDsTestPart_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("B0toDstarDsDist_ntuple", folder+"B0toDstarDsTestDefinition.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsDist_tf", folder+"B0toDstarDsTestDefinition_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsDist_DNN", folder+"B0toDstarDsTestDefinition_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("B0toDstarDsDist", folder+"B0toDstarDsTestDefinition_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("BkgDstar3pi_ntuple", folder+"BkgDstar3piNonres.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstar3pi_tf", folder+"BkgDstar3piNonres_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstar3pi_DNN", folder+"BkgDstar3piNonres_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstar3pi", folder+"BkgDstar3piNonres_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("BkgDstara1_ntuple", folder+"BkgDstara1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstara1_tf", folder+"BkgDstara1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstara1_DNN", folder+"BkgDstara1_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstara1", folder+"BkgDstara1_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("BkgDstara1Part_ntuple", folder+"BkgDstara1Part.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstara1Part_tf", folder+"BkgDstara1Part_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstara1Part_DNN", folder+"BkgDstara1Part_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstara1Part", folder+"BkgDstara1Part_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("BkgB0DD_ntuple", folder+"BkgB0DD.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgB0DD_tf", folder+"BkgB0DD_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgB0DD_DNN", folder+"BkgB0DD_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgB0DD", folder+"BkgB0DD_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("ButoDstarDK_ntuple", folder+"ButoDstarDK.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarDK_tf", folder+"ButoDstarDK_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarDK_DNN", folder+"ButoDstarDK_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarDK", folder+"ButoDstarDK_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("ButoDstarXc_ntuple", folder+"ButoDstarXc.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarXc_tf", folder+"ButoDstarXc_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarXc_DNN", folder+"ButoDstarXc_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("ButoDstarXc", folder+"ButoDstarXc_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("BkgBuDXc_ntuple", folder+"BkgBuDXc.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgBuDXc_tf", folder+"BkgBuDXc_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgBuDXc_DNN", folder+"BkgBuDXc_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgBuDXc", folder+"BkgBuDXc_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("BstoDD_ntuple", folder+"BstoDD.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BstoDD_tf", folder+"BstoDD_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BstoDD_DNN", folder+"BstoDD_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BstoDD", folder+"BstoDD_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("InclusiveRun3_ntuple", folder+"InclusiveRun3.root", "ntuplizer/tree"); 
-			filemanager.AddItem("InclusiveRun3_tf", folder+"InclusiveRun3_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("InclusiveRun3_DNN", folder+"InclusiveRun3_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("InclusiveRun3", folder+"InclusiveRun3_tauDNN_mva.root", "tree"); 
-
-			// data from D era
-			filemanager.AddItem("dataD1_ntuple", folder+"dataD1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD1_tf", folder+"dataD1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD1_DNN", folder+"dataD1_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD1", folder+"dataD1_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataD2_ntuple", folder+"dataD2.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD2_tf", folder+"dataD2_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD2_DNN", folder+"dataD2_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD2", folder+"dataD2_tauDNN_mva.root", "tree"); 
-			filemanager.AddItem("dataD2_SB", folder+"dataD2_tauDNN_mva_SB.root", "tree"); 
-
-			filemanager.AddItem("dataD3_ntuple", folder+"dataD3.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD3_tf", folder+"dataD3_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD3_DNN", folder+"dataD3_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD3", folder+"dataD3_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataD4_ntuple", folder+"dataD4.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD4_tf", folder+"dataD4_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD4_DNN", folder+"dataD4_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD4", folder+"dataD4_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataD5_ntuple", folder+"dataD5.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD5_tf", folder+"dataD5_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD5_DNN", folder+"dataD5_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD5", folder+"dataD5_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataD1WS_ntuple", folder+"dataD1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD1WS_tf", folder+"dataD1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD1WS_DNN", folder+"dataD1WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD1WS", folder+"dataD1WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataD2WS_ntuple", folder+"dataD2.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD2WS_tf", folder+"dataD2_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD2WS_DNN", folder+"dataD2WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD2WS", folder+"dataD2WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataD3WS_ntuple", folder+"dataD3.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD3WS_tf", folder+"dataD3_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD3WS_DNN", folder+"dataD3WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD3WS", folder+"dataD3WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataD4WS_ntuple", folder+"dataD4.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD4WS_tf", folder+"dataD4_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD4WS_DNN", folder+"dataD4WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD4WS", folder+"dataD4WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataD5WS_ntuple", folder+"dataD5.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD5WS_tf", folder+"dataD5_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD5WS_DNN", folder+"dataD5WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD5WS", folder+"dataD5WS_tauDNN_mva.root", "tree"); 
-
-			//filemanager.AddItem("dataD_ntuple", folder+"dataD.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataD_tf", folder+"dataD_withTFweight.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataD_DNN", folder+"dataD_tauDNN.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataD", folder+"dataD_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("data123_ntuple", folder+"data123.root", "ntuplizer/tree"); 
-			filemanager.AddItem("data123_tf", folder+"data123_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("data123_DNN", folder+"data123_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("data123", folder+"data123_tauDNN_mva.root", "tree"); 
-
-			// data from A era
-			filemanager.AddItem("dataA1_ntuple", folder+"dataA1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA1_tf", folder+"dataA1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA1_DNN", folder+"dataA1_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA1", folder+"dataA1_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataA2_ntuple", folder+"dataA2.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA2_tf", folder+"dataA2_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA2_DNN", folder+"dataA2_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA2", folder+"dataA2_tauDNN_mva.root", "tree"); 
-			filemanager.AddItem("dataA2_SB", folder+"dataA2_tauDNN_mva_SB.root", "tree"); 
-
-			filemanager.AddItem("dataA3_ntuple", folder+"dataA3.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA3_tf", folder+"dataA3_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA3_DNN", folder+"dataA3_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA3", folder+"dataA3_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataA4_ntuple", folder+"dataA4.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA4_tf", folder+"dataA4_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA4_DNN", folder+"dataA4_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA4", folder+"dataA4_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataA5_ntuple", folder+"dataA5.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA5_tf", folder+"dataA5_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA5_DNN", folder+"dataA5_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA5", folder+"dataA5_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataA1WS_ntuple", folder+"dataA1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA1WS_tf", folder+"dataA1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA1WS_DNN", folder+"dataA1WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA1WS", folder+"dataA1WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataA2WS_ntuple", folder+"dataA2.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA2WS_tf", folder+"dataA2_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA2WS_DNN", folder+"dataA2WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA2WS", folder+"dataA2WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataA3WS_ntuple", folder+"dataA3.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA3WS_tf", folder+"dataA3_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA3WS_DNN", folder+"dataA3WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA3WS", folder+"dataA3WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataA4WS_ntuple", folder+"dataA4.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA4WS_tf", folder+"dataA4_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA4WS_DNN", folder+"dataA4WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA4WS", folder+"dataA4WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataA5WS_ntuple", folder+"dataA5.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA5WS_tf", folder+"dataA5_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA5WS_DNN", folder+"dataA5WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataA5WS", folder+"dataA5WS_tauDNN_mva.root", "tree"); 
-
-			//filemanager.AddItem("dataA_ntuple", folder+"dataA.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataA_tf", folder+"dataA_withTFweight.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataA_DNN", folder+"dataA_tauDNN.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataA", folder+"dataA_tauDNN_mva.root", "tree"); 
-
-			// data from B era
-			filemanager.AddItem("dataB1_ntuple", folder+"dataB1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB1_tf", folder+"dataB1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB1_DNN", folder+"dataB1_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB1", folder+"dataB1_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataB2_ntuple", folder+"dataB2.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB2_tf", folder+"dataB2_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB2_DNN", folder+"dataB2_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB2", folder+"dataB2_tauDNN_mva.root", "tree"); 
-			filemanager.AddItem("dataB2_SB", folder+"dataB2_tauDNN_mva_SB.root", "tree"); 
-
-			filemanager.AddItem("dataB3_ntuple", folder+"dataB3.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB3_tf", folder+"dataB3_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB3_DNN", folder+"dataB3_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB3", folder+"dataB3_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataB4_ntuple", folder+"dataB4.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB4_tf", folder+"dataB4_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB4_DNN", folder+"dataB4_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB4", folder+"dataB4_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataB5_ntuple", folder+"dataB5.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB5_tf", folder+"dataB5_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB5_DNN", folder+"dataB5_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB5", folder+"dataB5_tauDNN_mva.root", "tree"); 
-
-			//filemanager.AddItem("dataB_ntuple", folder+"dataB.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataB_tf", folder+"dataB_withTFweight.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataB_DNN", folder+"dataB_tauDNN.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataB", folder+"dataB_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataB1WS_ntuple", folder+"dataB1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB1WS_tf", folder+"dataB1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB1WS_DNN", folder+"dataB1WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB1WS", folder+"dataB1WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataB2WS_ntuple", folder+"dataB2.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB2WS_tf", folder+"dataB2_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB2WS_DNN", folder+"dataB2WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB2WS", folder+"dataB2WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataB3WS_ntuple", folder+"dataB3.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB3WS_tf", folder+"dataB3_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB3WS_DNN", folder+"dataB3WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB3WS", folder+"dataB3WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataB4WS_ntuple", folder+"dataB4.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB4WS_tf", folder+"dataB4_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB4WS_DNN", folder+"dataB4WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB4WS", folder+"dataB4WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataB5WS_ntuple", folder+"dataB5.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB5WS_tf", folder+"dataB5_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB5WS_DNN", folder+"dataB5WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataB5WS", folder+"dataB5WS_tauDNN_mva.root", "tree"); 
-
-			// data from C era
-			filemanager.AddItem("dataC1_ntuple", folder+"dataC1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC1_tf", folder+"dataC1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC1_DNN", folder+"dataC1_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC1", folder+"dataC1_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataC2_ntuple", folder+"dataC2.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC2_tf", folder+"dataC2_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC2_DNN", folder+"dataC2_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC2", folder+"dataC2_tauDNN_mva.root", "tree"); 
-			filemanager.AddItem("dataC2_SB", folder+"dataC2_tauDNN_mva_SB.root", "tree"); 
-
-			filemanager.AddItem("dataC3_ntuple", folder+"dataC3.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC3_tf", folder+"dataC3_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC3_DNN", folder+"dataC3_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC3", folder+"dataC3_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataC4_ntuple", folder+"dataC4.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC4_tf", folder+"dataC4_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC4_DNN", folder+"dataC4_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC4", folder+"dataC4_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataC5_ntuple", folder+"dataC5.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC5_tf", folder+"dataC5_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC5_DNN", folder+"dataC5_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC5", folder+"dataC5_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataC1WS_ntuple", folder+"dataC1.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC1WS_tf", folder+"dataC1_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC1WS_DNN", folder+"dataC1WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC1WS", folder+"dataC1WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataC2WS_ntuple", folder+"dataC2.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC2WS_tf", folder+"dataC2_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC2WS_DNN", folder+"dataC2WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC2WS", folder+"dataC2WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataC3WS_ntuple", folder+"dataC3.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC3WS_tf", folder+"dataC3_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC3WS_DNN", folder+"dataC3WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC3WS", folder+"dataC3WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataC4WS_ntuple", folder+"dataC4.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC4WS_tf", folder+"dataC4_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC4WS_DNN", folder+"dataC4WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC4WS", folder+"dataC4WS_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("dataC5WS_ntuple", folder+"dataC5.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC5WS_tf", folder+"dataC5_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC5WS_DNN", folder+"dataC5WS_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataC5WS", folder+"dataC5WS_tauDNN_mva.root", "tree"); 
-
-			//filemanager.AddItem("dataC_ntuple", folder+"dataC.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataC_tf", folder+"dataC_withTFweight.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataC_DNN", folder+"dataC_tauDNN.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("dataC", folder+"dataC_tauDNN_mva.root", "tree"); 
-
-			//filemanager.AddItem("data_ntuple", folder+"data.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("data_tf", folder+"data_withTFweight.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("data_DNN", folder+"data_tauDNN.root", "ntuplizer/tree"); 
-			//filemanager.AddItem("data", folder+"data_tauDNN_mva.root", "tree"); 
-
-
-			filemanager.AddItem("dataD2TauWS_ntuple", folder+"ParkingBPHULA2WSTau.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD2TauWS_tf", folder+"ParkingBPHULA2WSTau_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD2TauWS_DNN", folder+"ParkingBPHULA2WSTau_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("dataD2TauWS", folder+"ParkingBPH2Run2018DTauWS_tauDNN_mva.root", "tree"); //ParkingBPH2Run2018DTauWS
-			//filemanager.AddItem("dataD2TauWS", folder+"ParkingBPHULA2WSTau_tauDNN_mva.root", "tree"); //ParkingBPH2Run2018DTauWS
-
-			filemanager.AddItem("Test_ntuple", folder+"Test.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Test_tf", folder+"Test_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Test_DNN", folder+"Test_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Test", folder+"Test_tauDNN_mva.root", "tree"); 
-
-			const TString specialRunFileName = "Sig"; // Hack to run on given file
-
-			filemanager.AddItem("SpecialRun_ntuple", folder+specialRunFileName+".root", "ntuplizer/tree"); 
-			filemanager.AddItem("SpecialRun_tf", folder+specialRunFileName+"_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SpecialRun_DNN", folder+specialRunFileName+"_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SpecialRun", folder+specialRunFileName+"_tauDNN_mva.root", "tree"); 
-
-			// To be deprecated 
-			filemanager.AddItem("SigOld_ntuple", folder+"SignalOfficialMC50M.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigOld_tf", folder+"SignalOfficialMC50M_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigOld_DNN", folder+"SignalOfficialMC50M_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigOld", folder+"SignalOfficialMC50M_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("SigPartOld_ntuple", folder+"SignalOfficialMC50MNoGenMatch.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigPartOld_tf", folder+"SignalOfficialMC50MNoGenMatch_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigPartOld_DNN", folder+"SignalOfficialMC50MNoGenMatch_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SigPartOld", folder+"SignalOfficialMC50MNoGenMatch_tauDNN_mva.root", "tree"); 
+			folder = "/eos/home-m/mhuwiler/software/rh9/AnaBoosted/data/Run3_2023_BoostedPrivate/"; // TODO: set this from environment variable 
+			folderbase = "/eos/home-m/mhuwiler/software/rh9/AnaBoosted/data/";
+
+			filemanager.AddItem("ggFofficial", "/eos/home-m/mhuwiler/data/HHtobbtautau/NanoAODv12/Run3Summer22NanoAODv12_1-1.root", "Events"); 
+			filemanager.AddItem("ggFv15", "/eos/home-m/mhuwiler/data/HHtobbtautau/NanoAODv15/signalggF.root", "Events"); 
+
+
+			filemanager.AddItem("ggf", folder+"ggf.root", "Events"); 
+			filemanager.AddItem("ggfall", folder+"ggFHHtobbtautau.root", "Events"); 
+			filemanager.AddItem("ggfhh", folder+"ggFHHtobbtautau_hh", "Events"); 
+			filemanager.AddItem("ggfhm", folder+"ggFHHtobbtautau_hm", "Events"); 
+			filemanager.AddItem("ggfhe", folder+"ggFHHtobbtautau_he", "Events"); 
+
+			filemanager.AddItem("VBF", folder+"VBF_SM.root", "Events"); 
+			filemanager.AddItem("VBFall", folder+"VBFHHtobbtautau.root", "Events"); 
+			filemanager.AddItem("VBFhh", folder+"VBFHHtobbtautau_hh.root", "Events"); 
+			filemanager.AddItem("VBFhm", folder+"VBFHHtobbtautau_hm.root", "Events"); 
+			filemanager.AddItem("VBFhe", folder+"VBFHHtobbtautau_he.root", "Events"); 
+
+			filemanager.AddItem("QCD", folder+"qcd_HT_100-1200.root", "Events"); 
+			filemanager.AddItem("QCDall", folder+"QCD.root", "Events"); 
+			filemanager.AddItem("QCDhh", folder+"QCD_hh.root", "Events"); 
+			filemanager.AddItem("QCDhm", folder+"QCD_hm.root", "Events"); 
+			filemanager.AddItem("QCDhe", folder+"QCD_he.root", "Events"); 
+
+			filemanager.AddItem("data", folder+"jetmet.root", "Events"); 
+			filemanager.AddItem("dataall", folder+"data.root", "Events"); 
+			filemanager.AddItem("datahh", folder+"data_hh.root", "Events"); 
+			filemanager.AddItem("datahm", folder+"data_hm.root", "Events"); 
+			filemanager.AddItem("datahe", folder+"data_he.root", "Events"); 
 
 
 		}
 
 		else 
 		{
-			filemanager.AddItem("prodlatest", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/flatTupleDataLatest.root", "ntuplizer/tree"); 
-			filemanager.AddItem("MCgenmatched", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/flatTupleGenmatchedAllSingleTauLatest.root", "ntuplizer/tree"); 
-
-			filemanager.AddItem("MCOfficialSample", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/all.root", "ntuplizer/tree"); 
-			filemanager.AddItem("DstarDsMCfirst", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/bkgDstarDsFirst.root", "ntuplizer/tree"); 
-			filemanager.AddItem("DataWS", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/DataWS.root", "ntuplizer/tree"); 
-			filemanager.AddItem("DataLatest", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/DataLast.root", "ntuplizer/tree"); 
-			filemanager.AddItem("MCofficial", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/MCFirstSubmission.root", "ntuplizer/tree"); 
-			filemanager.AddItem("DataLarge", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/DataVeryLarge.root", "ntuplizer/tree"); 
-
-			// For ABCD estimation
-			filemanager.AddItem("DataLargeMVAfirst", "/eos/home-m/mhuwiler/data/Analysis/v9/DataVeryLarge_mva.root", "tree"); 
-			filemanager.AddItem("DataLargeMVA", "/eos/home-m/mhuwiler/data/Analysis/v9/DataVeryLarge_mvaxgb.root", "tree"); 
-			filemanager.AddItem("DataLargeMVASimple", "/eos/home-m/mhuwiler/data/Analysis/v9/DataVeryLarge_converted_mvaxgbsimple.root", "tree"); 
-			filemanager.AddItem("MCvalidation", "/eos/home-m/mhuwiler/data/Analysis/v9/TauCutflowSample_mva.root", "tree"); 
-			filemanager.AddItem("signalTrain", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/scripts/MVA/trainingBayesian/trainingLarge/plots.root", "signalTrain"); 
-			filemanager.AddItem("signalTest", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/scripts/MVA/trainingBayesian/trainingLarge/plots.root", "signalTest"); 
-			filemanager.AddItem("backgroundTrain", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/scripts/MVA/trainingBayesian/trainingLarge/plots.root", "backgroundTrain"); 
-			filemanager.AddItem("backgroundTest", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/scripts/MVA/trainingBayesian/trainingLarge/plots.root", "backgroundTest"); 
-			filemanager.AddItem("DataBackground", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/DataVeryLarge_converted.root", "tree"); 
-			filemanager.AddItem("MCSignal", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/PrivateProductionGenDstar_converted.root", "tree"); 
-			filemanager.AddItem("ParkingBPHAllRun2018B", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/ParkingBPHRun2018B_converted.root", "tree"); 
-
-
-			// Towards stable productions
-			filemanager.AddItem("SignalOfficialMC50M", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/SignalOfficialMC50M.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SignalOfficialMC50M_tf", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/SignalOfficialMC50M_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SignalOfficialMC50M_DNN", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/SignalOfficialMC50M_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SignalOfficialMC50M_MVA", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/SignalOfficialMC50M_tauDNN_mva.root", "tree"); 
-			filemanager.AddItem("SignalOfficialMC50M_test", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/SignalOfficialMC50MwithTFweightTest.root", "ntuplizer/tree"); // TODO: drop? 
-
-			filemanager.AddItem("BkgDstarDs", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/firstDstarDsMultipleTau.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDsMMultipleTau_tf", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/firstDstarDsMultipleTau_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDsMMultipleTau_DNN", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/firstDstarDsMultipleTau_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgDstarDsMultipleTau_MVA", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/firstDstarDsMultipleTau_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("Data2018BFirst", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/prod2018BFirst.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Data2018BFirst_tf", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/prod2018BFirst_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Data2018BFirst_DNN", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/prod2018BFirst_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Data2018BFirst_MVA", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/prod2018BFirst_tauDNN_mva.root", "tree"); 
-			filemanager.AddItem("Data2018BFirst10k_tf", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/prod2018BFirst_withTFweight10k.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Data2018BFirst10k_DNN", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/prod2018BFirst_tauDNN10k.root", "ntuplizer/tree"); // Fixme 
-
-			// TODO: drop? 
-			filemanager.AddItem("Data2018BFirstTest", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/firstAllTau.root", "ntuplizer/tree"); 
-			filemanager.AddItem("Data2018BFirstTest_tf", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/firstAllTau_withTFweight.root", "ntuplizer/tree"); 
-
-			filemanager.AddItem("BkgBtoDstar3piNonres_tf", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/B0toDstar3piFirst_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgBtoDstar3piNonres_DNN", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/B0toDstar3piFirst_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgBtoDstar3piNonres_MVA", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/B0toDstar3piFirst_tauDNN_mva.root", "tree"); 
-
-			filemanager.AddItem("BkgBtoDstarDsstar_tf", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/BkgDstarDsstarInclPrivateProdFirst_withTFweight.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgBtoDstarDsstar_DNN", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/BkgDstarDsstarInclPrivateProdFirst_tauDNN.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgBtoDstarDsstar_MVA", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/BkgDstarDsstarInclPrivateProdFirst_tauDNN_mva.root", "tree"); 
-			//filemanager.AddItem("SignalOfficialMC50M_DNN_test", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/SignalOfficialMC50M_tauDNN.root", "ntuplizer/tree"); 
-
-			// For legacy compatibility
-			filemanager.AddItem("ParkingBPHAllRun2018B", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/ParkingBPHRun2018B.root", "ntuplizer/tree"); 
-			filemanager.AddItem("SignalOfficialMC50M_mva", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/SignalOfficialMC50M_converted_mva.root", "tree"); 
-			filemanager.AddItem("ParkingBPHAllRun2018B_mva", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/ParkingBPHRun2018B_converted_mva.root", "tree"); 
-			filemanager.AddItem("BkgBtoDstarDs", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/BkgDstarDsInclPrivateProdFirst.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgBtoDstar3piNonres", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/B0toDstar3piFirst.root", "ntuplizer/tree"); 
-			filemanager.AddItem("BkgBtoDstarDsstar", "/eos/home-m/mhuwiler/DoctoralThesis/Analysis/data/BkgDstarDsstarInclPrivateProdFirst.root", "ntuplizer/tree"); 
+			
 		}
 
 		//ABCDconfig = {"(b_tau_sumdnn>1.9)", "(b_tau_sumdnn<1.5)", "b_B_nmu<1&&b_B_ne<1&&b_B_nh<1", "(b_B_nmu<1&&b_B_ne<1)&&b_B_nh>1"}; 

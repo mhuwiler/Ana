@@ -85,7 +85,7 @@ if __name__ == "__main__":
 	sig = loadFile("ggfBoostedPrivate")
 
 	if (options.test): 
-		sig = generalise(sig.Range(0, 5000))
+		sig = generalise(sig.Range(0, 500))
 
 	ROOT.gStyle.SetOptStat(0)
 
