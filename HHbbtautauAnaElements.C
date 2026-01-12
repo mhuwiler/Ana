@@ -1054,14 +1054,28 @@ namespace Ana
 
 		int tauJet = -999.; 
 
+		std::vector<std::pair<double, int> > jetRanking; 
+
 		for (unsigned int i=0; i<nJets; i++) 
 		{
 			if (pt[i] < ptThres) continue; 
 			if (eta[i] > etaThres) continue; 
 			if (id[i] < idThres) continue; 
 
-			tauJet = i;
-			break; 
+			jetRanking.push_back(std::make_pair(id[i], i)); 
+		}
+
+		std::sort(jetRanking.begin(), jetRanking.end()); //std::less<>()
+
+		/*std::cout << "Sorting..." << std::endl; 
+		for (auto element : jetRanking) 
+		{
+			std::cout << "Jet ID: " << element.first << " " << element.second << std::endl; 
+		}*/
+
+		if (jetRanking.size()) 
+		{
+			tauJet = jetRanking[0].second; 
 		}
 
 		return tauJet; 
