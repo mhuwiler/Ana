@@ -1023,7 +1023,7 @@ namespace Ana
 
 
 	int RecoMuon(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& dz, const ROOT::VecOps::RVec<float>& dxy, const float jetEta, const float jetPhi) 
-	{ // TODO: add tau jet eta phi (single float)
+	{
 		int n = pt.size(); 
 		assert(eta.size() == n); 
 		assert(phi.size() == n); 
@@ -1074,7 +1074,8 @@ namespace Ana
 
 		int tauJet = -999.; 
 
-		std::vector<std::pair<double, int> > jetRanking; 
+		//std::vector<std::pair<double, int> > jetRanking; 
+		int idPrev = -999.; 
 
 		for (unsigned int i=0; i<nJets; i++) 
 		{
@@ -1082,10 +1083,15 @@ namespace Ana
 			if (eta[i] > etaThres) continue; 
 			if (id[i] < idThres) continue; 
 
-			jetRanking.push_back(std::make_pair(id[i], i)); 
+			//jetRanking.push_back(std::make_pair(id[i], i)); 
+			if (id[i] > idPrev) 
+			{
+				idPrev = id[i]; 
+				tauJet = i; 
+			}
 		}
 
-		std::sort(jetRanking.begin(), jetRanking.end()); //std::less<>()
+		//std::sort(jetRanking.begin(), jetRanking.end()); //std::less<>()
 
 		/*std::cout << "Sorting..." << std::endl; 
 		for (auto element : jetRanking) 
@@ -1093,10 +1099,10 @@ namespace Ana
 			std::cout << "Jet ID: " << element.first << " " << element.second << std::endl; 
 		}*/
 
-		if (jetRanking.size()) 
+		/*if (jetRanking.size()) 
 		{
 			tauJet = jetRanking[0].second; 
-		}
+		}*/
 
 		return tauJet; 
 	}
