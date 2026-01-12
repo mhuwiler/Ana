@@ -25,6 +25,8 @@ samples = [Sig, data, "B0toDstarDs", "B0toDstarDsstar", "B0toDstarD", "ButoDstar
 
 fitsamples = [Sig, "data_obs", "B0toDstarDs", "B0toDstarDsstar", "B0toDstarD", "ButoDstarDK", "ABCD"] #"B0toDstara1"
 
+tauIDvar = "globalParT3" #globalParT3_Xtauhtaum
+
 regions = ["SR", "CR", "SB"]
 
 variables = ["b_B_q2", "b_B_m", "b_tau_m", "b_B_mm2"] #"b_tau_rhomass1", "b_tau_rhomass2", 

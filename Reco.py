@@ -113,7 +113,7 @@ if __name__ == "__main__":
 
 	#sig = sig.Define("TheGenMuon_pt", "Ana::overflowProtected(GenPart_pt, GenDecay.mu)").Define("TheGenMuon_eta", "GenPart_eta[GenDecay.mu]").Define("TheGenMuon_phi", "GenPart_phi[GenDecay.mu]")
 
-	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "globalParT3_Xtauhtaum"))
+	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xtauhtaum".format(anaConfig.tauIDvar)))
 
 	sig = sig.Define("TheRecoMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_tightId, {0}_dz, {0}_dxy)".format("Muon"))
 
