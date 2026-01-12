@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
 	print(sig)
 
-	dropBranchNames(sig, "branchnames.txt", ["L1", "HLT", "DST"])
+	dropBranchNames(sig, "branchnamesNanoAODv12.txt", ["L1", "HLT", "DST"])
 
 	#sig = Ana.GetP4(sig, "Muon") #sig = Ana.GetP4["float"](sig, "Muon")
 	#sig = Ana.GetGenParticles(sig, "Muon")
@@ -116,6 +116,15 @@ if __name__ == "__main__":
 	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xtauhtaum".format(anaConfig.tauIDvar)))
 
 	sig = sig.Define("TheRecoMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_tightId, {0}_dz, {0}_dxy)".format("Muon"))
+
+	# Constructing normalised discriminators
+	sig = sig.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD0HF)".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtaum/({0}_{1}_QCD0HF+{0}_{1}_Xtauhtaum)".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtaue/({0}_{1}_QCD0HF+{0}_{1}_Xtauhtaue)".format("FatJet", anaConfig.tauIDvar))
+
+	sig = sig.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD0HF+{0}_{1}_TopbW)".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaum/({0}_{1}_Xtauhtaum+{0}_{1}_QCD0HF+{0}_{1}_TopbW)".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaue/({0}_{1}_Xtauhtaue+{0}_{1}_QCD0HF+{0}_{1}_TopbW)".format("FatJet", anaConfig.tauIDvar))
 
 
 	gensig = sig.Define("GenDecay", "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)".format("GenPart"))
