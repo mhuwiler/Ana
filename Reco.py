@@ -131,13 +131,11 @@ if __name__ == "__main__":
 
 	cutflow = ROOT.CutFlow("cutflow", "Selection cutflow")
 
-	n0 = sig.Count().GetValue()
-	cutflow.Increment("Initial", n0)
+	cutflow.Increment("Initial", sig.Count().GetValue())
 
 	sig = sig.Filter("nFatJet>=2").Filter("FatJet_pt[0]>250&&FatJet_pt[1]>200")
 
-	n1 = sig.Count().GetValue()
-	cutflow.Add("jet selection", n1)
+	cutflow.Add("jet selection", sig.Count().GetValue())
 
 	#sig = sig.Define("GenDecay", "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)".format("GenPart"))
 
@@ -163,6 +161,8 @@ if __name__ == "__main__":
 
 	sig = sig.Filter("(TheTauFatJet!=ThebFatJet)") # removing overlap between bb and tautau jets
 
+	cutflow.Add("no overlap b tau", sig.Count().GetValue())
+
 
 	gensig = sig.Define("GenDecay", "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)".format("GenPart"))
 
@@ -183,25 +183,21 @@ if __name__ == "__main__":
 
 	hm = gensig.Filter("GenDecay.decayType==2")
 
-	n2 = hm.Count().GetValue()
-	cutflow.Add("tauh taumu", n2)
+	cutflow.Add("tauh taumu", hm.Count().GetValue())
 
 	hi = hm.Filter("dR_mu_FatJet<1.6&&dR_mu_FatJet>0")
 
-	n3 = hi.Count().GetValue()
-	cutflow.Add("gen mu in jet", n3)
+	cutflow.Add("gen mu in jet", hi.Count().GetValue())
 
 	hi = hi.Define("TheRecoMuon_pt", "Muon_pt[closest_mu_gen]")
 
 	hi = hi.Filter("Muon_tightId[closest_mu_gen]")
 
-	n4 = hi.Count().GetValue()
-	cutflow.Add("reco mu matched", n4)
+	cutflow.Add("reco mu matched", hi.Count().GetValue())
 
 	hi = hi.Filter("Muon_pt[closest_mu_gen]>20&&abs(Muon_eta[closest_mu_gen])<2.4&&Muon_dz[closest_mu_gen]<0.2&&Muon_dxy[closest_mu_gen]<0.05")
 
-	n5 = hi.Count().GetValue()
-	cutflow.Add("muon sel", n5)
+	cutflow.Add("muon sel", hi.Count().GetValue())
 
 	#hh = hh.Define("dR_tautau", "Ana::deltaR(GenDecay.tau1, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {0}_pt, {0}_eta, {0}_phi, {0}_mass, GenDecay.tau2)".format("GenPart"))
 
@@ -216,7 +212,11 @@ if __name__ == "__main__":
 
 	#hi.Snapshot("Events", "./Sigwithproxy.root", Ana.purgeColumns(hi.GetColumnNames(), blacklist))
 
-	print("Initial: {}, 2 FatJets: {}, tauhtaumu: {}, gen mu within jet: {}, reco mu within jet: {}, other selection requirements: {}".format(n0, n1, n2, n3, n4, n5))
+	#print("Initial: {}, 2 FatJets: {}, tauhtaumu: {}, gen mu within jet: {}, reco mu within jet: {}, other selection requirements: {}".format(n0, n1, n2, n3, n4, n5))
+
+	# TODO: implement this into the cutflow class 
+	cutflow.Print()
+
 
 	canvas = ROOT.TCanvas("canvas", "canvas", 800, 600)
 	histo = cutflow.GenerateHistogram()
