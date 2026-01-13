@@ -993,7 +993,7 @@ namespace Ana
 	{
 		double genpt = overflowProtected(genPt, genParticle); 
 		double candpt = overflowProtected(pt, cand); 
-		if (genpt < 0. || candpt < 0.) return genpt; // If gen particle is out of bounds, return default overflow value
+		if (genpt < 0. || candpt < 0.) return defaultValue<float>(); // If gen particle is out of bounds, return default overflow value
 		TLorentzVector gen, candidate; 
 		gen.SetPtEtaPhiM(genpt, overflowProtected(genEta, genParticle), overflowProtected(genPhi, genParticle), overflowProtected(genMass, genParticle)); 
 		candidate.SetPtEtaPhiM(candpt, eta[cand], phi[cand], m[cand]); 
