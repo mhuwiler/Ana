@@ -54,6 +54,36 @@ def generalise(df):
 	return ROOT.ROOT.RDF.AsRNode(df)
 
 
+def AdditionalVariables(sample): 
+	# Adding AK8 jet related varibles
+
+	# Defining n-subjettiness ratios 
+	sample = sample.Define("{}_tau21".format("FatJet"), "{0}_tau2/{0}_tau1".format("FatJet"))
+	sample = sample.Define("{}_tau32".format("FatJet"), "{0}_tau3/{0}_tau2".format("FatJet"))
+
+
+	# Constructing normalised discriminators
+	sample = sample.Define("{}_{}_QCD".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_QCD0HF+{0}_{1}_QCD1HF+{0}_{1}_QCD2HF".format("FatJet", anaConfig.tauIDvar))
+	sample = sample.Define("{}_{}_Top".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_TopbW+{0}_{1}_TopW".format("FatJet", anaConfig.tauIDvar))
+	sample = sample.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD)".format("FatJet", anaConfig.tauIDvar))
+	sample = sample.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtaum/({0}_{1}_QCD+{0}_{1}_Xtauhtaum)".format("FatJet", anaConfig.tauIDvar))
+	sample = sample.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtaue/({0}_{1}_QCD+{0}_{1}_Xtauhtaue)".format("FatJet", anaConfig.tauIDvar))
+
+	sample = sample.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
+	sample = sample.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaum/({0}_{1}_Xtauhtaum+{0}_{1}_QCD+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
+	sample = sample.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaue/({0}_{1}_Xtauhtaue+{0}_{1}_QCD+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
+
+	sample = sample.Define("{}_{}_Xbb{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xbb/({0}_{1}_QCD+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar))
+	sample = sample.Define("{}_{}_Xbb{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xbb/({0}_{1}_QCD+{0}_{1}_Xbb+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
+
+	# TODO: add those variables https://github.com/LPC-HH/bbtautau/blob/591d8d1acea32896ef652157d5547ffccd861130/src/bbtautau/processors/objects.py#L75
+
+
+	return sample
+
+
+
+
 
 if __name__ == "__main__":
 
@@ -113,34 +143,23 @@ if __name__ == "__main__":
 
 	#sig = sig.Define("TheGenMuon_pt", "Ana::overflowProtected(GenPart_pt, GenDecay.mu)").Define("TheGenMuon_eta", "GenPart_eta[GenDecay.mu]").Define("TheGenMuon_phi", "GenPart_phi[GenDecay.mu]")
 
-	# Defining n-subjettiness ratios 
-	sig = sig.Define("{}_tau21".format("FatJet"), "{0}_tau2/{0}_tau1".format("FatJet"))
-	sig = sig.Define("{}_tau32".format("FatJet"), "{0}_tau3/{0}_tau2".format("FatJet"))
 
-
+	sig = AdditionalVariables(sig)
+	
 
 	# TODO: try out taking the max from tauhtauh,tauhtaumu, tauhtaue
-	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xtauhtaum".format(anaConfig.tauIDvar)))
+	sig = sig.Define("{}_{}_tautau".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_Xtauhtaum+{0}_{1}_Xtauhtauh+{0}_{1}_Xtauhtaue".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_tautau".format(anaConfig.tauIDvar)))
 
 	sig = sig.Define("TheTauFatJet_eta", "Ana::overflowProtected(FatJet_eta, TheTauFatJet)").Define("TheTauFatJet_phi", "Ana::overflowProtected(FatJet_phi, TheTauFatJet)")
-	sig = sig.Define("TheRecoMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_phi, {0}_tightId, {0}_dz, {0}_dxy, {1}_eta, {1}_phi)".format("Muon", "TheTauFatJet"))
-
-	# Constructing normalised discriminators
-	sig = sig.Define("{}_{}_QCD".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_QCD0HF+{0}_{1}_QCD1HF+{0}_{1}_QCD2HF".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("{}_{}_Top".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_TopbW+{0}_{1}_TopW".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD)".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtaum/({0}_{1}_QCD+{0}_{1}_Xtauhtaum)".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xtauhtaue/({0}_{1}_QCD+{0}_{1}_Xtauhtaue)".format("FatJet", anaConfig.tauIDvar))
-
-	sig = sig.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaum/({0}_{1}_Xtauhtaum+{0}_{1}_QCD+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xtauhtaue/({0}_{1}_Xtauhtaue+{0}_{1}_QCD+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
-
-	sig = sig.Define("{}_{}_Xbb{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xbb/({0}_{1}_QCD+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("{}_{}_Xbb{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xbb/({0}_{1}_QCD+{0}_{1}_Xbb+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
+	sig = sig.Define("TheMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_phi, {0}_tightId, {0}_dz, {0}_dxy, {1}_eta, {1}_phi)".format("Muon", "TheTauFatJet"))
 
 
 	sig = sig.Define("ThebFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xbb".format(anaConfig.tauIDvar)))
+
+	sig = sig.Filter("TheTauFatJet>0&&TheMuon>0&&ThebFatJet>0")
+
+	cutflow.Add("topology reco", sig.Count().GetValue())
 
 	sig = sig.Filter("(TheTauFatJet!=ThebFatJet)") # removing overlap between bb and tautau jets
 
