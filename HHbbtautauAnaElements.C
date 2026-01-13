@@ -1022,7 +1022,7 @@ namespace Ana
 	}
 
 
-	int RecoMuon(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& dz, const ROOT::VecOps::RVec<float>& dxy, const float jetEta, const float jetPhi) 
+	int RecoMuon(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<int>& id, const ROOT::VecOps::RVec<float>& dz, const ROOT::VecOps::RVec<float>& dxy, const float jetEta, const float jetPhi) 
 	{
 		int n = pt.size(); 
 		assert(eta.size() == n); 
@@ -1034,7 +1034,7 @@ namespace Ana
 		double etaThres = 2.4; 
 		double dzThres = 0.2; 
 		double dxyThres = 0.045; 
-		double idThres = 0.2; 
+		//double idThres = 0.2; // The ID is a bool 
 		double drThres = 1.5; 
 
 
@@ -1046,7 +1046,7 @@ namespace Ana
 			if (eta[i] > etaThres) continue; 
 			if (dz[i] > dzThres) continue; 
 			if (dxy[i] > dxyThres) continue; 
-			if (id[i] < idThres) continue; 
+			if (id[i]) continue; 
 			double dR = deltaR(eta[i], phi[i], jetEta, jetPhi); // ROOT::Math::VectorUtil::DeltaR(eta[i], phi[i], jetEta, jetPhi); 
 			if (dR > drThres) continue; 
 
