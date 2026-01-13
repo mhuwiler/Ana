@@ -155,7 +155,7 @@ if __name__ == "__main__":
 	sig = sig.Define("TheMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_phi, {0}_tightId, {0}_dz, {0}_dxy, {1}_eta, {1}_phi)".format("Muon", "TheTauFatJet"))
 
 
-	sig = sig.Define("ThebFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xbb".format(anaConfig.tauIDvar)))
+	sig = sig.Define("ThebFatJet", "Ana::RecoBJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xbb".format(anaConfig.tauIDvar)))
 
 	sig = sig.Filter("TheTauFatJet>0&&TheMuon>0&&ThebFatJet>0")
 

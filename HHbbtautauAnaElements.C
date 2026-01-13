@@ -1108,6 +1108,56 @@ namespace Ana
 	}
 
 
+	int RecoBJet(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& id) 
+	{
+		int nJets = pt.size(); 
+		assert(eta.size() == nJets); 
+		assert(phi.size() == nJets); 
+		assert(mass.size() == nJets); 
+
+		// Muon selection requirements 
+		double ptThres = 200.; 
+		double etaThres = 2.4; 
+		double idThres = 0.2; 
+		
+
+
+		int bJet = -999.; 
+
+		//std::vector<std::pair<double, int> > jetRanking; 
+		int idPrev = -999.; 
+
+		for (unsigned int i=0; i<nJets; i++) 
+		{
+			if (pt[i] < ptThres) continue; 
+			if (eta[i] > etaThres) continue; 
+			if (id[i] < idThres) continue; 
+
+			//jetRanking.push_back(std::make_pair(id[i], i)); 
+			if (id[i] > idPrev) 
+			{
+				idPrev = id[i]; 
+				bJet = i; 
+			}
+		}
+
+		//std::sort(jetRanking.begin(), jetRanking.end()); //std::less<>()
+
+		/*std::cout << "Sorting..." << std::endl; 
+		for (auto element : jetRanking) 
+		{
+			std::cout << "Jet ID: " << element.first << " " << element.second << std::endl; 
+		}*/
+
+		/*if (jetRanking.size()) 
+		{
+			bJet = jetRanking[0].second; 
+		}*/
+
+		return bJet; 
+	}
+
+
 
 	void AddColumn(ROOT::RDF::RNode* df, const std::string &newColName) {
     	*df = df->Define(newColName, [](){ return 42; });
