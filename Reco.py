@@ -166,6 +166,10 @@ if __name__ == "__main__":
 
 	gensig = sig.Define("GenDecay", "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)".format("GenPart"))
 
+	gensig = gensig.Define("dR_gen_reco_mu", "Ana::deltaR(GenDecay.mu, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, TheMuon)".format("GenPart", "Muon"))
+	gensig = gensig.Define("TheGenMuon_pt", "Ana::overflowProtected(GenPart_pt, GenDecay.mu)").Define("TheGenMuon_eta", "GenPart_eta[GenDecay.mu]").Define("TheGenMuon_phi", "GenPart_phi[GenDecay.mu]")
+	gensig = gensig.Define("TheRecoMuon_pt", "Ana::overflowProtected(Muon_pt, TheMuon)").Define("TheRecoMuon_eta", "Muon_eta[TheMuon]").Define("TheRecoMuon_phi", "Muon_phi[TheMuon]")
+
 	gensig = gensig.Define("dR_HH", "Ana::deltaR(GenDecay.Htotau, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {0}_pt, {0}_eta, {0}_phi, {0}_mass, GenDecay.Htob)".format("GenPart"))
 
 	gensig = gensig.Define("dR_tautau", "Ana::deltaR(GenDecay.tau1, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {0}_pt, {0}_eta, {0}_phi, {0}_mass, GenDecay.tau2)".format("GenPart"))
@@ -189,7 +193,7 @@ if __name__ == "__main__":
 
 	cutflow.Add("gen mu in jet", hi.Count().GetValue())
 
-	hi = hi.Define("TheRecoMuon_pt", "Muon_pt[closest_mu_gen]")
+	#hi = hi.Define("TheRecoMuon_pt", "Muon_pt[closest_mu_gen]")
 
 	hi = hi.Filter("Muon_tightId[closest_mu_gen]")
 
@@ -205,6 +209,8 @@ if __name__ == "__main__":
 	blacklist = ["Muon_P4", "GenPart_Particle", "GenMuon", "HLT*", "L1*"] # TODO: add autoblacklist
 
 	sig.Snapshot("Events", "./SigAll.root", Ana.purgeColumns(sig.GetColumnNames(), blacklist))
+
+	gensig.Snapshot("Events", "./SigAllwithGen.root", Ana.purgeColumns(gensig.GetColumnNames(), blacklist))
 
 	#hh.Snapshot("Events", "./Sighh.root", Ana.purgeColumns(hh.GetColumnNames(), blacklist))
 
