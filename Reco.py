@@ -49,6 +49,9 @@ def dropBranchNames(frame, filename, exclusionlist = []):
 			if not (any([excluded in name for excluded in exclusionlist])): 
 				file.write("{}\n".format(name))
 
+def WriteFile(sample, filename, blacklist, treename = "Events"): 
+	sample.Snapshot(treename, filename, Ana.purgeColumns(sample.GetColumnNames(), blacklist))
+
 
 def generalise(df): 
 	return ROOT.ROOT.RDF.AsRNode(df)
@@ -214,7 +217,7 @@ if __name__ == "__main__":
 
 	blacklist = ["Muon_P4", "GenPart_Particle", "GenMuon", "HLT*", "L1*"] # TODO: add autoblacklist
 
-	sig.Snapshot("Events", "./SigAll.root", Ana.purgeColumns(sig.GetColumnNames(), blacklist))
+	WriteFile(sig, "./SigAll.root", blacklist)
 
 	gensig.Snapshot("Events", "./SigAllwithGen.root", Ana.purgeColumns(gensig.GetColumnNames(), blacklist))
 
