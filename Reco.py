@@ -14,6 +14,9 @@ from ROOT import Ana, TCanvas, TH1D, TPad, TLegend, THStack, RDataFrame
 from argparse import ArgumentParser
 
 
+blacklist = ["Muon_P4", "GenPart_Particle", "GenMuon", "HLT*", "L1*"] # TODO: add autoblacklist
+
+
 filedict = {"sigggF": "/eos/home-m/mhuwiler/data/HHtobbtautau/NanoAODv15/signalggF.root", }
 Ana.filemanager.AddItem("sigggF", "/eos/home-m/mhuwiler/data/HHtobbtautau/NanoAODv15/signalggF.root", "Events")
 Ana.filemanager.AddItem("official", "/eos/home-m/mhuwiler/data/HHtobbtautau/NanoAODv12/Run3Summer22NanoAODv12_1-1.root", "Events")
@@ -215,11 +218,10 @@ if __name__ == "__main__":
 	#hh = hh.Define("dR_tautau", "Ana::deltaR(GenDecay.tau1, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {0}_pt, {0}_eta, {0}_phi, {0}_mass, GenDecay.tau2)".format("GenPart"))
 
 
-	blacklist = ["Muon_P4", "GenPart_Particle", "GenMuon", "HLT*", "L1*"] # TODO: add autoblacklist
-
+	
 	WriteFile(sig, "./SigAll.root", blacklist)
 
-	gensig.Snapshot("Events", "./SigAllwithGen.root", Ana.purgeColumns(gensig.GetColumnNames(), blacklist))
+	WriteFile(gensig, "./SigAllwithGen.root", blacklist)
 
 	#hh.Snapshot("Events", "./Sighh.root", Ana.purgeColumns(hh.GetColumnNames(), blacklist))
 
