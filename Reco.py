@@ -115,7 +115,7 @@ if __name__ == "__main__":
 	sig = loadFile("ggfBoostedPrivate")
 
 	if (options.test): 
-		sig = generalise(sig.Range(0, 500))
+		sig = generalise(sig.Range(0, 500000))
 
 	ROOT.gStyle.SetOptStat(0)
 
@@ -147,15 +147,21 @@ if __name__ == "__main__":
 
 	# TODO: try out taking the max from tauhtauh,tauhtaumu, tauhtaue
 	sig = sig.Define("{}_{}_tautau".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_Xtauhtaum+{0}_{1}_Xtauhtauh+{0}_{1}_Xtauhtaue".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_tautau".format(anaConfig.tauIDvar)))
+	#sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xtauhtaum".format(anaConfig.tauIDvar)))
+	#sig = sig.Define("TheTauFatJet", "1")
+	#sig = sig.Define("ThebFatJet", "0")
+
+	sig = sig.Define("ThebFatJet", "Ana::RecoBJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xbb".format(anaConfig.tauIDvar)))
+	sig = sig.Define("TheTauFatJet", "1-ThebFatJet")
 
 	sig = sig.Define("TheTauFatJet_eta", "Ana::overflowProtected(FatJet_eta, TheTauFatJet)").Define("TheTauFatJet_phi", "Ana::overflowProtected(FatJet_phi, TheTauFatJet)")
+	sig = sig.Define("TheTauFatJet_{}_Xtauhtaum".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtaum, TheTauFatJet)".format(anaConfig.tauIDvar)).Define("TheTauFatJet_{}_Xtauhtauh".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtauh, TheTauFatJet)".format(anaConfig.tauIDvar)).Define("TheTauFatJet_{}_Xtauhtaue".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtaue, TheTauFatJet)".format(anaConfig.tauIDvar)).Define("TheBFatJet_{}_Xbb".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xbb, ThebFatJet)".format(anaConfig.tauIDvar))
 	sig = sig.Define("TheMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_phi, {0}_tightId, {0}_dz, {0}_dxy, {1}_eta, {1}_phi)".format("Muon", "TheTauFatJet"))
 
 
-	sig = sig.Define("ThebFatJet", "Ana::RecoBJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xbb".format(anaConfig.tauIDvar)))
+	
 
-	sig = sig.Filter("TheTauFatJet>0&&TheMuon>0&&ThebFatJet>0")
+	sig = sig.Filter("TheTauFatJet>=0&&TheMuon>=0&&ThebFatJet>=0")
 
 	cutflow.Add("topology reco", sig.Count().GetValue())
 
@@ -189,19 +195,19 @@ if __name__ == "__main__":
 
 	cutflow.Add("tauh taumu", hm.Count().GetValue())
 
-	hi = hm.Filter("dR_mu_FatJet<1.6&&dR_mu_FatJet>0")
+	#hi = hm.Filter("dR_mu_FatJet<1.6&&dR_mu_FatJet>0")
 
-	cutflow.Add("gen mu in jet", hi.Count().GetValue())
+	#cutflow.Add("gen mu in jet", hi.Count().GetValue())
 
 	#hi = hi.Define("TheRecoMuon_pt", "Muon_pt[closest_mu_gen]")
 
-	hi = hi.Filter("Muon_tightId[closest_mu_gen]")
+	#hi = hi.Filter("Muon_tightId[closest_mu_gen]")
 
-	cutflow.Add("reco mu matched", hi.Count().GetValue())
+	#cutflow.Add("reco mu matched", hi.Count().GetValue())
 
-	hi = hi.Filter("Muon_pt[closest_mu_gen]>20&&abs(Muon_eta[closest_mu_gen])<2.4&&Muon_dz[closest_mu_gen]<0.2&&Muon_dxy[closest_mu_gen]<0.05")
+	#hi = hi.Filter("Muon_pt[closest_mu_gen]>20&&abs(Muon_eta[closest_mu_gen])<2.4&&Muon_dz[closest_mu_gen]<0.2&&Muon_dxy[closest_mu_gen]<0.05")
 
-	cutflow.Add("muon sel", hi.Count().GetValue())
+	#cutflow.Add("muon sel", hi.Count().GetValue())
 
 	#hh = hh.Define("dR_tautau", "Ana::deltaR(GenDecay.tau1, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {0}_pt, {0}_eta, {0}_phi, {0}_mass, GenDecay.tau2)".format("GenPart"))
 
