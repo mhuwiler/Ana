@@ -1132,7 +1132,7 @@ namespace Ana
 		// Muon selection requirements 
 		double ptThres = 200.; 
 		double etaThres = 2.4; 
-		double idThres = 0.2; 
+		double idThres = 0.5; 
 		
 
 
@@ -1145,7 +1145,7 @@ namespace Ana
 		{
 			if (pt[i] < ptThres) continue; 
 			if (eta[i] > etaThres) continue; 
-			if (id[i] < idThres) continue; 
+			//if (id[i] < idThres) continue; 
 
 			//jetRanking.push_back(std::make_pair(id[i], i)); 
 			if (id[i] > idPrev) 
@@ -1182,7 +1182,7 @@ namespace Ana
 		// Muon selection requirements 
 		double ptThres = 200.; 
 		double etaThres = 2.4; 
-		double idThres = 0.2; 
+		double idThres = 0.3; 
 		
 
 
