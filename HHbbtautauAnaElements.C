@@ -989,6 +989,69 @@ namespace Ana
 	}
 
 
+	int closestMatchBelowThreshold(int genParticle, const ROOT::VecOps::RVec<float>& genPt, const ROOT::VecOps::RVec<float>& genEta, const ROOT::VecOps::RVec<float>& genPhi, const ROOT::VecOps::RVec<float>& genMass, const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& m, const ROOT::VecOps::RVec<float>& pdgId = std::vector<float>(), const std::string particleType = "") 
+	{
+		if (overflowProtected(genPt, genParticle) < 0.) return defaultValue<int>(); 
+		TLorentzVector gen; 
+		gen.SetPtEtaPhiM(overflowProtected(genPt, genParticle), overflowProtected(genEta, genParticle), overflowProtected(genPhi, genParticle), overflowProtected(genMass, genParticle)); 
+
+		int type = PDGid[particleType]; 
+
+
+		float dR = 999.; 
+		int closest = -999; 
+
+		TLorentzVector P4; 
+		for (unsigned int i = 0; i<pt.size(); i++) 
+		{
+			if ((pdgId.size() != pt.size()) || (abs(pdgId[i]) != type)) continue; 
+			P4.SetPtEtaPhiM(pt[i], eta[i], phi[i], m[i]); 
+
+			float currentdR = P4.DeltaR(gen); 
+
+			if ((currentdR < dR) && (currentdR < matchingDrThres)) 
+			{
+				dR = currentdR; 
+				closest = i; 
+			}
+		}
+
+		return closest; 
+	};
+
+
+	/*int closestMatch[&matchingDrThres](int genParticle, const ROOT::VecOps::RVec<float>& genPt, const ROOT::VecOps::RVec<float>& genEta, const ROOT::VecOps::RVec<float>& genPhi, const ROOT::VecOps::RVec<float>& genMass, const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& m, const ROOT::VecOps::RVec<float>& pdgId = std::vector<float>(), const std::string particleType = "") 
+	{
+		constexpr double matchingDrThres = 0.05; // The maximal dR separation when genmatching 
+		if (overflowProtected(genPt, genParticle) < 0.) return defaultValue<int>(); 
+		TLorentzVector gen; 
+		gen.SetPtEtaPhiM(overflowProtected(genPt, genParticle), overflowProtected(genEta, genParticle), overflowProtected(genPhi, genParticle), overflowProtected(genMass, genParticle)); 
+
+		int type = PDGid[particleType]; 
+
+
+		float dR = 999.; 
+		int closest = -999; 
+
+		TLorentzVector P4; 
+		for (unsigned int i = 0; i<pt.size(); i++) 
+		{
+			if ((pdgId.size() != pt.size()) || (abs(pdgId[i]) != type)) continue; 
+			P4.SetPtEtaPhiM(pt[i], eta[i], phi[i], m[i]); 
+
+			float currentdR = P4.DeltaR(gen); 
+
+			if ((currentdR < dR) && (currentdR < matchingDrThres)) 
+			{
+				dR = currentdR; 
+				closest = i; 
+			}
+		}
+
+		return closest; 
+	};*/
+
+
 	float deltaR(int genParticle, const ROOT::VecOps::RVec<float>& genPt, const ROOT::VecOps::RVec<float>& genEta, const ROOT::VecOps::RVec<float>& genPhi, const ROOT::VecOps::RVec<float>& genMass, const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& m, const int cand) 
 	{
 		double genpt = overflowProtected(genPt, genParticle); 
