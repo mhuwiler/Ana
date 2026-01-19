@@ -197,6 +197,10 @@ if __name__ == "__main__":
 	gensig = DefineBTaggerVarsForJet("GenMatchedbFatJet", gensig)
 	gensig = DefineTauTaggerVarsForJet("GenMatchedbFatJet", gensig)
 	gensig = DefineBTaggerVarsForJet("GenMatchedTauFatJet", gensig)
+	gensig = gensig.Define("SubSubLeadingFatJet", "3")
+	gensig = DefineTauTaggerVarsForJet("SubSubLeadingFatJet", gensig)
+	gensig = DefineBTaggerVarsForJet("SubSubLeadingFatJet", gensig)
+
 
 
 	gensig = gensig.Define("dR_gen_reco_mu", "Ana::deltaR(GenDecay.mu, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, TheMuon)".format("GenPart", "Muon"))
