@@ -162,6 +162,7 @@ if __name__ == "__main__":
 
 	sig = sig.Define("TheTauFatJet_eta", "Ana::overflowProtected(FatJet_eta, TheTauFatJet)").Define("TheTauFatJet_phi", "Ana::overflowProtected(FatJet_phi, TheTauFatJet)")
 	sig = sig.Define("TheTauFatJet_{}_Xtauhtaum".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtaum, TheTauFatJet)".format(anaConfig.tauIDvar)).Define("TheTauFatJet_{}_Xtauhtauh".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtauh, TheTauFatJet)".format(anaConfig.tauIDvar)).Define("TheTauFatJet_{}_Xtauhtaue".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtaue, TheTauFatJet)".format(anaConfig.tauIDvar)).Define("TheBFatJet_{}_Xbb".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xbb, ThebFatJet)".format(anaConfig.tauIDvar))
+	#sig = sig.Define("TheTauFatJet_eta", "Ana::overflowProtected(FatJet_eta, TheTauFatJet)").Define("TheTauFatJet_phi", "Ana::overflowProtected(FatJet_phi, TheTauFatJet)")
 	sig = sig.Define("TheMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_phi, {0}_tightId, {0}_dz, {0}_dxy, {1}_eta, {1}_phi)".format("Muon", "TheTauFatJet"))
 
 
@@ -177,6 +178,12 @@ if __name__ == "__main__":
 
 
 	gensig = sig.Define("GenDecay", "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)".format("GenPart"))
+
+	gensig = gensig.Define("GenMatchedTauFatJet", "Ana::closestMatch(GenDecay.Htotau, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenPart", "FatJet"))
+	gensig = gensig.Define("GenMatchedbFatJet", "Ana::closestMatch(GenDecay.Htob, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenPart", "FatJet"))
+	gensig = gensig.Define("OverlapbTauJet", "GenMatchedTauFatJet==GenMatchedbFatJet")
+
+
 
 	gensig = gensig.Define("dR_gen_reco_mu", "Ana::deltaR(GenDecay.mu, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, TheMuon)".format("GenPart", "Muon"))
 	gensig = gensig.Define("TheGenMuon_pt", "Ana::overflowProtected(GenPart_pt, GenDecay.mu)").Define("TheGenMuon_eta", "GenPart_eta[GenDecay.mu]").Define("TheGenMuon_phi", "GenPart_phi[GenDecay.mu]")
