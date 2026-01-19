@@ -973,7 +973,7 @@ namespace Ana
 		TLorentzVector P4; 
 		for (unsigned int i = 0; i<pt.size(); i++) 
 		{
-			if ((pdgId.size() != pt.size()) || (abs(pdgId[i]) != type)) continue; 
+			if ((pdgId.size() == pt.size()) && (abs(pdgId[i]) != type)) continue; 
 			P4.SetPtEtaPhiM(pt[i], eta[i], phi[i], m[i]); 
 
 			float currentdR = P4.DeltaR(gen); 
