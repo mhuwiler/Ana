@@ -192,6 +192,9 @@ if __name__ == "__main__":
 	gensig = gensig.Define("GenMatchedTauFatJet", "Ana::closestMatch(GenDecay.Htotau, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenPart", "FatJet"))
 	gensig = gensig.Define("GenMatchedbFatJet", "Ana::closestMatch(GenDecay.Htob, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenPart", "FatJet"))
 	gensig = gensig.Define("OverlapbTauJet", "GenMatchedTauFatJet==GenMatchedbFatJet")
+	gensig = gensig.Define("dR_gen_reco_bb", "Ana::deltaR(GenDecay.Htob, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, GenMatchedbFatJet)".format("GenPart", "FatJet"))
+	gensig = gensig.Define("dR_gen_reco_tautau", "Ana::deltaR(GenDecay.Htotau, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, GenMatchedTauFatJet)".format("GenPart", "FatJet"))
+
 
 	gensig = DefineTauTaggerVarsForJet("GenMatchedTauFatJet", gensig)
 	gensig = DefineBTaggerVarsForJet("GenMatchedbFatJet", gensig)
