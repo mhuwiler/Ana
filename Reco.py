@@ -200,6 +200,8 @@ if __name__ == "__main__":
 	gensig = gensig.Define("dR_gen_reco_tau2", "Ana::deltaR(GenDecay.tau2, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, GenMatchedTauFatJet)".format("GenPart", "FatJet"))
 	gensig = gensig.Filter("dR_gen_reco_bb<0.8&&dR_gen_reco_tautau<0.8&&dR_gen_reco_b1<0.8&&dR_gen_reco_b2<0.8")
 	#gensig = gensig.Filter("dR_gen_reco_tau1<0.8&&dR_gen_reco_tau2<0.8")
+	gensig = gensig.Define("ClosestFatJettoGenMatchedbFatJet", "Ana::closestMatch(GenMatchedbFatJet, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {0}_pt, {0}_eta, {0}_phi, {0}_mass)".format("FatJet"))
+	gensig = gensig.Define("dR_reco_bb_closest", "Ana::deltaR(ClosestFatJettoGenMatchedbFatJet, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {0}_pt, {0}_eta, {0}_phi, {0}_mass, GenMatchedbFatJet)".format("FatJet"))
 
 
 	gensig = DefineTauTaggerVarsForJet("GenMatchedTauFatJet", gensig)
