@@ -88,6 +88,16 @@ def AdditionalVariables(sample):
 	return sample
 
 
+def DefineTauTaggerVarsForJet(theJet, sample): 
+	sample = sample.Define("{}_{}_Xtauhtaum".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtaum, {})".format(anaConfig.tauIDvar, theJet)).Define("{}_{}_Xtauhtauh".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtauh, {})".format(anaConfig.tauIDvar, theJet)).Define("{}_{}_Xtauhtaue".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtaue, {})".format(anaConfig.tauIDvar, theJet))
+	return sample
+
+
+def DefineBTaggerVarsForJet(theJet, sample): 
+	sample = sample.Define("{}_{}_Xbb".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xbb, {})".format(anaConfig.tauIDvar, theJet))
+	return sample
+
+
 
 
 
@@ -182,6 +192,9 @@ if __name__ == "__main__":
 	gensig = gensig.Define("GenMatchedTauFatJet", "Ana::closestMatch(GenDecay.Htotau, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenPart", "FatJet"))
 	gensig = gensig.Define("GenMatchedbFatJet", "Ana::closestMatch(GenDecay.Htob, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenPart", "FatJet"))
 	gensig = gensig.Define("OverlapbTauJet", "GenMatchedTauFatJet==GenMatchedbFatJet")
+
+	gensig = DefineTauTaggerVarsForJet("GenMatchedTauFatJet", gensig)
+	gensig = DefineBTaggerVarsForJet("GenMatchedbFatJet", gensig)
 
 
 
