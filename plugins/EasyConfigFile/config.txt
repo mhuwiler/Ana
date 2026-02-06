@@ -1,0 +1,3 @@
+file=path/to/file.root
+MyDouble=3.14
+MyInt=42

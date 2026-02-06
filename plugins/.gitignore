@@ -1,0 +1,12 @@
+.lastlxplus
+*.pdf
+*.png
+*.jpeg
+*.gif
+*.eps
+*.root
+.sys.v#*
+*.d
+*.so
+*.pcm
+
