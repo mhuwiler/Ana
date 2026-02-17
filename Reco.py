@@ -99,6 +99,39 @@ def DefineBTaggerVarsForJet(theJet, sample):
 	return sample
 
 
+def ApplyTriggerSelection(sample): 
+	hadronicTriggers = ["HLT_AK8PFJet250_SoftDropMass40_PFAK8ParticleNetBB0p35", "HLT_AK8PFJet230_SoftDropMass40_PFAK8ParticleNetTauTau0p30", "HLT_AK8PFJet230_SoftDropMass40_PNetBB0p06", "HLT_AK8PFJet230_SoftDropMass40_PNetTauTau0p03", "HLT_AK8PFJet420_MassSD30", "HLT_AK8PFJet425_SoftDropMass40",]
+	resolvedTriggers = ["HLT_QuadPFJet70_50_40_35_PFBTagParticleNet_2BTagSum0p65", "HLT_QuadPFJet70_50_40_35_PNet2BTagMean0p65", "HLT_QuadPFJet103_88_75_15_PFBTagDeepJet_1p3_VBF2", "HLT_QuadPFJet103_88_75_15_DoublePFBTagDeepJet_1p3_7p7_VBF1",]
+	hadronicTriggers += resolvedTriggers
+	tauTriggers = ["HLT_LooseDeepTauPFTauHPS180_L2NN_eta2p1", "HLT_DoubleMediumDeepTauPFTauHPS35_L2NN_eta2p1", "HLT_DoubleMediumDeepTauPFTauHPS30_L2NN_eta2p1_PFJet60", "HLT_DoubleMediumDeepTauPFTauHPS30_L2NN_eta2p1_PFJet75",]
+	muonTriggers = ["HLT_IsoMu24", "HLT_Mu50", "HLT_IsoMu20_eta2p1_LooseDeepTauPFTauHPS27_eta2p1_CrossL1",]
+	electronTriggers = ["HLT_Ele30_WPTight_Gsf", "HLT_Ele115_CaloIdVT_GsfTrkIdT", "HLT_Ele50_CaloIdVT_GsfTrkIdT_PFJet165", "HLT_Photon200", "HLT_Ele24_eta2p1_WPTight_Gsf_LooseDeepTauPFTauHPS30_eta2p1_CrossL1",]
+	METTriggers = ["HLT_PFMET120_PFMHT120_IDTight", "HLT_PFHT280_QuadPFJet30_PNet2BTagMean0p55", "HLT_PFHT340_QuadPFJet70_50_40_40_PNet2BTagMean0p70",]
+
+	# define which triggers to be selected on
+	triggers = hadronicTriggers + tauTriggers + muonTriggers + electronTriggers + METTriggers
+
+	
+	branches = [str(name) for name in sample.GetColumnNames()] # Get the column names
+			
+
+	activetriggers = []
+
+	for path in triggers: # check which triggers exist in the sample
+		if ((path in branches)): 
+			print(path)
+			activetriggers.append(path)
+
+
+	triggerselection = "||".join(activetriggers)
+	print(triggerselection)
+
+
+	sample = sample.Filter(triggerselection)
+
+	return sample
+
+
 
 
 
@@ -153,6 +186,8 @@ if __name__ == "__main__":
 	sig = sig.Filter("nFatJet>=2").Filter("FatJet_pt[0]>250&&FatJet_pt[1]>200")
 
 	cutflow.Add("jet selection", sig.Count().GetValue())
+
+	sig = ApplyTriggerSelection(sig)
 
 	#sig = sig.Define("GenDecay", "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)".format("GenPart"))
 
