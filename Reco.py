@@ -90,11 +90,12 @@ def AdditionalVariables(sample):
 
 def DefineTauTaggerVarsForJet(theJet, sample): 
 	sample = sample.Define("{}_{}_Xtauhtaum".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtaum, {})".format(anaConfig.tauIDvar, theJet)).Define("{}_{}_Xtauhtauh".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtauh, {})".format(anaConfig.tauIDvar, theJet)).Define("{}_{}_Xtauhtaue".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtaue, {})".format(anaConfig.tauIDvar, theJet))
+	sample = sample.Define("{}_{}_XtauhtaumvsQCD".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_XtauhtaumvsQCD, {})".format(anaConfig.tauIDvar, theJet)).Define("{}_{}_XtauhtauhvsQCD".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_XtauhtauhvsQCD, {})".format(anaConfig.tauIDvar, theJet)).Define("{}_{}_XtauhtauevsQCD".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_XtauhtauevsQCD, {})".format(anaConfig.tauIDvar, theJet))
 	return sample
 
 
 def DefineBTaggerVarsForJet(theJet, sample): 
-	sample = sample.Define("{}_{}_Xbb".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xbb, {})".format(anaConfig.tauIDvar, theJet))
+	sample = sample.Define("{}_{}_Xbb".format(theJet, anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xbb, {})".format(anaConfig.tauIDvar, theJet)).Define("{}_btagDeepB".format(theJet), "Ana::overflowProtected(FatJet_btagDeepB, {})".format(theJet))
 	return sample
 
 
