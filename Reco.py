@@ -24,6 +24,7 @@ Ana.filemanager.AddItem("ggfBoostedPrivate", "/eos/home-m/mhuwiler/software/rh9/
 Ana.filemanager.AddItem("VBFBoostedPrivate", "/eos/home-m/mhuwiler/software/rh9/AnaBoosted/data/Run3_2023_BoostedPrivate/VBFHHto2b2tau/VBF_SM.root", "Events")
 Ana.filemanager.AddItem("QCDBoostedPrivate", "/eos/home-m/mhuwiler/software/rh9/AnaBoosted/data/Run3_2023_BoostedPrivate/QCD/qcd_HT_100-1200.root", "Events")
 Ana.filemanager.AddItem("VBFBoostedPrivate", "/eos/home-m/mhuwiler/software/rh9/AnaBoosted/data/Run3_2023_BoostedPrivate/dataset/jetmet.root", "Events")
+Ana.filemanager.AddItem("ggfBoostedPrivateLarge", "/eos/home-m/mhuwiler/software/rh9/AnaBoosted/data/Run3_2023_BoostedPrivate/glugluHHto2b2tau/ggf_large.root", "Events")
 
 
 def loadFile(desc): 
