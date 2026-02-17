@@ -298,6 +298,9 @@ if __name__ == "__main__":
 
 	WriteFile(gensig, "./SigAllwithGen.root", blacklist)
 
+	gensig = gensig.Filter("{0}_{1}_Xbb[{2}]<0.4&&{0}_particleNetLegacy_Xbb[{2}]>0.6".format("FatJet", anaConfig.tauIDvar, "GenMatchedbFatJet"))
+	WriteFile(gensig, "./SigAllwithGen_misclassified.root", blacklist)
+
 	#hh.Snapshot("Events", "./Sighh.root", Ana.purgeColumns(hh.GetColumnNames(), blacklist))
 
 	#hm.Snapshot("Events", "./Sighm.root", Ana.purgeColumns(hm.GetColumnNames(), blacklist))
