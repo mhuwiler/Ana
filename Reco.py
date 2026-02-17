@@ -178,11 +178,11 @@ if __name__ == "__main__":
 
 	
 
-	sig = sig.Filter("TheTauFatJet>=0&&TheMuon>=0&&ThebFatJet>=0")
+	#sig = sig.Filter("TheTauFatJet>=0&&TheMuon>=0&&ThebFatJet>=0")
 
 	cutflow.Add("topology reco", sig.Count().GetValue())
 
-	sig = sig.Filter("(TheTauFatJet!=ThebFatJet)") # removing overlap between bb and tautau jets
+	#sig = sig.Filter("(TheTauFatJet!=ThebFatJet)") # removing overlap between bb and tautau jets
 
 	cutflow.Add("no overlap b tau", sig.Count().GetValue())
 
