@@ -931,7 +931,7 @@ namespace Ana
 	}
 
 
-	float deltaR(int genParticle, const ROOT::VecOps::RVec<float>& genPt, const ROOT::VecOps::RVec<float>& genEta, const ROOT::VecOps::RVec<float>& genPhi, const ROOT::VecOps::RVec<float>& genMass, const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& m, const ROOT::VecOps::RVec<float>& pdgId = std::vector<float>(), const std::string particleType = "") 
+	float deltaR(int genParticle, const ROOT::VecOps::RVec<float>& genPt, const ROOT::VecOps::RVec<float>& genEta, const ROOT::VecOps::RVec<float>& genPhi, const ROOT::VecOps::RVec<float>& genMass, const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& m, const ROOT::VecOps::RVec<int>& pdgId = std::vector<int>(), const std::string particleType = "") 
 	{
 		double genpt = overflowProtected(genPt, genParticle); 
 		if (genpt < 0) return genpt; // If gen particle is out of bounds, return default overflow value
@@ -958,7 +958,7 @@ namespace Ana
 	}
 
 
-	int closestMatch(int genParticle, const ROOT::VecOps::RVec<float>& genPt, const ROOT::VecOps::RVec<float>& genEta, const ROOT::VecOps::RVec<float>& genPhi, const ROOT::VecOps::RVec<float>& genMass, const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& m, const ROOT::VecOps::RVec<float>& pdgId = std::vector<float>(), const std::string particleType = "") 
+	int closestMatch(int genParticle, const ROOT::VecOps::RVec<float>& genPt, const ROOT::VecOps::RVec<float>& genEta, const ROOT::VecOps::RVec<float>& genPhi, const ROOT::VecOps::RVec<float>& genMass, const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& m, const ROOT::VecOps::RVec<int>& pdgId = std::vector<int>(), const std::string particleType = "") 
 	{
 		if (overflowProtected(genPt, genParticle) < 0.) return defaultValue<int>(); 
 		TLorentzVector gen; 
