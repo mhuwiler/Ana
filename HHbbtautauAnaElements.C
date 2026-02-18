@@ -1239,7 +1239,7 @@ namespace Ana
 	}
 
 
-	int RecoBJet(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& id) 
+	int RecoBJet(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& id, const int excluded = defaultValue<int>() ) 
 	{
 		int nJets = pt.size(); 
 		assert(eta.size() == nJets); 
@@ -1260,6 +1260,7 @@ namespace Ana
 
 		for (unsigned int i=0; i<nJets; i++) 
 		{
+			if ((excluded != defaultValue<int>()) && (excluded == i)) continue; 
 			if (pt[i] < ptThres) continue; 
 			if (eta[i] > etaThres) continue; 
 			if (id[i] < idThres) continue; 

@@ -200,12 +200,12 @@ if __name__ == "__main__":
 
 	# TODO: try out taking the max from tauhtauh,tauhtaumu, tauhtaue
 	sig = sig.Define("{}_{}_tautau".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_Xtauhtaum+{0}_{1}_Xtauhtauh+{0}_{1}_Xtauhtaue".format("FatJet", anaConfig.tauIDvar))
-	#sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xtauhtaum".format(anaConfig.tauIDvar)))
+	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xtauhtaum".format(anaConfig.tauIDvar)))
 	#sig = sig.Define("TheTauFatJet", "1")
 	#sig = sig.Define("ThebFatJet", "0")
 
-	sig = sig.Define("ThebFatJet", "Ana::RecoBJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xbb".format(anaConfig.tauIDvar)))
-	sig = sig.Define("TheTauFatJet", "1-ThebFatJet")
+	sig = sig.Define("ThebFatJet", "Ana::RecoBJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1}, TheTauFatJet)".format("FatJet", "{}_Xbb".format(anaConfig.tauIDvar)))
+	#sig = sig.Define("TheTauFatJet", "1-ThebFatJet")
 
 	sig = sig.Define("TheTauFatJet_eta", "Ana::overflowProtected(FatJet_eta, TheTauFatJet)").Define("TheTauFatJet_phi", "Ana::overflowProtected(FatJet_phi, TheTauFatJet)")
 	sig = sig.Define("TheTauFatJet_{}_Xtauhtaum".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtaum, TheTauFatJet)".format(anaConfig.tauIDvar)).Define("TheTauFatJet_{}_Xtauhtauh".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtauh, TheTauFatJet)".format(anaConfig.tauIDvar)).Define("TheTauFatJet_{}_Xtauhtaue".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xtauhtaue, TheTauFatJet)".format(anaConfig.tauIDvar)).Define("TheBFatJet_{}_Xbb".format(anaConfig.tauIDvar), "Ana::overflowProtected(FatJet_{}_Xbb, ThebFatJet)".format(anaConfig.tauIDvar))
