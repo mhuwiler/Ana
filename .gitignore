@@ -130,3 +130,5 @@ tmp/
 temp/
 scratch/
 work/
+
+.claude/

@@ -1,0 +1,487 @@
+"""
+Plotting utilities for scouting analysis.
+
+Contains:
+  - ROOT TH1 / TEfficiency -> numpy converters
+  - Trigger efficiency overlay plot
+  - Yield overlay plot
+  - Stacked MC + data plot
+  - CMS style setup via mplhep
+"""
+
+import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import mplhep as hep
+from matplotlib.lines import Line2D
+
+import ROOT
+
+
+# ---------------------------------------------------------------------------
+# Style setup
+# ---------------------------------------------------------------------------
+
+def setup_style():
+    """Apply CMS style via mplhep and set standard rcParams."""
+    plt.style.use(hep.style.CMS)
+    mpl.rcParams.update({
+        "figure.dpi": 120,
+        "savefig.dpi": 300,
+        "savefig.bbox": "tight",
+        "axes.labelsize": 13,
+        "axes.titlesize": 13,
+        "xtick.labelsize": 13,
+        "ytick.labelsize": 13,
+        "legend.fontsize": 13,
+        "legend.title_fontsize": 13,
+        "axes.linewidth": 1.2,
+        "xtick.direction": "in",
+        "ytick.direction": "in",
+        "xtick.major.size": 6,
+        "ytick.major.size": 6,
+        "xtick.minor.size": 3,
+        "ytick.minor.size": 3,
+    })
+
+
+# ---------------------------------------------------------------------------
+# ROOT -> numpy converters
+# ---------------------------------------------------------------------------
+
+def th1_to_np(h):
+    """Convert a ROOT TH1 to (edges, values, errors) numpy arrays."""
+    nb = h.GetNbinsX()
+    edges = np.array(
+        [h.GetXaxis().GetBinLowEdge(1 + i) for i in range(nb)]
+        + [h.GetXaxis().GetBinUpEdge(nb)],
+        dtype=float,
+    )
+    vals = np.array([h.GetBinContent(1 + i) for i in range(nb)], dtype=float)
+    errs = np.array([h.GetBinError(1 + i) for i in range(nb)], dtype=float)
+    return edges, vals, errs
+
+
+def teff_to_np(teff):
+    """Convert a ROOT TEfficiency to (x, y, xerr, yerr_lo, yerr_hi) numpy arrays."""
+    htot = teff.GetTotalHistogram()
+    nb = htot.GetNbinsX()
+    x, y, yerr_lo, yerr_hi, xerr = [], [], [], [], []
+    for i in range(1, nb + 1):
+        tot = htot.GetBinContent(i)
+        if tot <= 0:
+            continue
+        xc = htot.GetXaxis().GetBinCenter(i)
+        hw = 0.5 * htot.GetXaxis().GetBinWidth(i)
+        eff = float(np.clip(teff.GetEfficiency(i), 0.0, 1.0))
+        elo = float(np.clip(teff.GetEfficiencyErrorLow(i), 0.0, 1.0))
+        ehi = float(np.clip(teff.GetEfficiencyErrorUp(i), 0.0, 1.0))
+
+        x.append(xc)
+        xerr.append(hw)
+        y.append(eff)
+        yerr_lo.append(elo)
+        yerr_hi.append(ehi)
+
+    return (np.array(x), np.array(y), np.array(xerr),
+            np.array(yerr_lo), np.array(yerr_hi))
+
+
+# ---------------------------------------------------------------------------
+# Trigger efficiency overlay (multi-channel, multi-trigger)
+# ---------------------------------------------------------------------------
+
+def plot_trigger_eff_overlay_channels(
+    channels, triggers, *,
+    var="gen_mHH", weight="w", pre_expr=None,
+    nbins=20, xmin=200.0, xmax=1800.0,
+    cms_year="2024", cms_com="13.6", cms_label_text="",
+    figsize=(10, 10),
+    pre_label="Preselection", trigger_colors=None,
+    pre_key="pre",
+    pre_color=None,
+    xlabel=None,
+):
+    """
+    Overlay trigger efficiency for multiple decay channels and triggers.
+
+    channels: list of dicts like
+      [
+        {"key":"hh", "label":"HH->bbthth",  "df":sig_df_hh, "ls":"-",  "marker":"o"},
+        {"key":"hm", "label":"HH->bbteth",  "df":sig_df_hm, "ls":"--", "marker":"s"},
+        {"key":"he", "label":"HH->bbtmth",  "df":sig_df_he, "ls":":",  "marker":"^"},
+      ]
+
+    triggers: list of dicts like
+      [
+        {"key":"all", "expr": DST_ALL_expr, "label":"Data Scouting", "lw":2.5},
+        {"key":"nom", "expr": NOM_expr,     "label":"Nominal",       "lw":2.5},
+        {"key":"park","expr": PARK_expr,    "label":"Data Parking",  "lw":2.5},
+      ]
+    """
+    if trigger_colors is None:
+        trigger_colors = {}
+
+    color_map = {
+        pre_key: trigger_colors.get(pre_key, "tab:blue"),
+    }
+    for t in triggers:
+        k = t["key"]
+        color_map[k] = trigger_colors.get(k, {
+            "nom": "tab:orange",
+            "park": "tab:green",
+            "all": "tab:red",
+        }.get(k, "black"))
+
+    # Book all histogram actions
+    h_pre_ptrs = []
+    h_num_ptrs = {t["key"]: [] for t in triggers}
+
+    for i, ch in enumerate(channels):
+        df = ch["df"]
+        df_pre = df if (pre_expr is None or str(pre_expr).strip() in ["", "1"]) else df.Filter(pre_expr)
+
+        h_pre_ptrs.append(
+            df_pre.Histo1D(
+                (f"h_pre_{i}", f";{var} [GeV];Events", nbins, xmin, xmax),
+                var, weight,
+            )
+        )
+        for t in triggers:
+            k = t["key"]
+            h_num_ptrs[k].append(
+                df_pre.Filter(t["expr"]).Histo1D(
+                    (f"h_{k}_{i}", f";{var} [GeV];Events", nbins, xmin, xmax),
+                    var, weight,
+                )
+            )
+
+    # Run once
+    all_ptrs = list(h_pre_ptrs)
+    for k in h_num_ptrs:
+        all_ptrs.extend(h_num_ptrs[k])
+    try:
+        ROOT.RDF.RunGraphs(all_ptrs)
+    except Exception:
+        pass
+
+    # Materialize + TEfficiency + numpy per channel
+    per_ch = []
+    for i, ch in enumerate(channels):
+        Hpre = h_pre_ptrs[i].GetValue()
+        Hnums = {t["key"]: h_num_ptrs[t["key"]][i].GetValue() for t in triggers}
+
+        effs = {}
+        for t in triggers:
+            k = t["key"]
+            te = ROOT.TEfficiency(Hnums[k], Hpre)
+            te.SetUseWeightedEvents(True)
+            effs[k] = te
+
+        edges, pre_vals, pre_errs = th1_to_np(Hpre)
+        num_np = {k: th1_to_np(Hnums[k])[1:] for k in Hnums}
+        eff_np = {k: teff_to_np(effs[k]) for k in effs}
+
+        per_ch.append({
+            "key": ch.get("key", f"ch{i}"),
+            "label": ch.get("label", f"ch{i}"),
+            "ls": ch.get("ls", "-"),
+            "marker": ch.get("marker", "o"),
+            "edges": edges,
+            "pre": (pre_vals, pre_errs),
+            "num": num_np,
+            "eff_np": eff_np,
+            "Hpre": Hpre,
+            "Hnums": Hnums,
+            "effs": effs,
+        })
+
+    # Plot: one figure, overlay everything
+    fig = plt.figure(figsize=figsize)
+    gs = fig.add_gridspec(2, 1, height_ratios=[3, 1], hspace=0.05)
+    ax = fig.add_subplot(gs[0])
+    rax = fig.add_subplot(gs[1], sharex=ax)
+
+    # TOP: preselection + trigger shapes
+    for ch in per_ch:
+        edges = ch["edges"]
+        pre_vals, _ = ch["pre"]
+        ax.step(
+            edges, np.r_[pre_vals, pre_vals[-1]],
+            where="post", linewidth=2.5,
+            linestyle=ch["ls"], color=color_map[pre_key],
+        )
+        for t in triggers:
+            k = t["key"]
+            vals, _errs = ch["num"][k]
+            ax.step(
+                edges, np.r_[vals, vals[-1]],
+                where="post", linewidth=float(t.get("lw", 2.5)),
+                linestyle=ch["ls"], color=color_map[k],
+            )
+
+    ax.set_ylabel("Yields")
+    ax.tick_params(labelbottom=False)
+    hep.cms.label(cms_label_text, data=False, ax=ax, year=str(cms_year), com=str(cms_com))
+
+    # BOTTOM: efficiencies
+    for ch in per_ch:
+        for t in triggers:
+            k = t["key"]
+            x, y, xerr_arr, ylo, yhi = ch["eff_np"][k]
+            rax.errorbar(
+                x, y,
+                xerr=xerr_arr,
+                yerr=np.vstack([ylo, yhi]),
+                fmt=ch["marker"],
+                markersize=float(t.get("markersize", 5.0)),
+                capsize=2, linewidth=1.2, linestyle="none",
+                color=color_map[k],
+            )
+
+    rax.set_xlabel(xlabel if xlabel is not None else rf"{var} [GeV]")
+    rax.set_ylabel("Trigger Efficiency")
+    rax.set_ylim(0.0, 1.1)
+    rax.grid(True, axis="y", alpha=0.3)
+
+    # Legends
+    channel_handles = [
+        Line2D([0], [0], color="black", linestyle=ch.get("ls", "-"),
+               marker=ch.get("marker", "o"), markersize=6, linewidth=2,
+               label=ch.get("label", ch.get("key", "ch")))
+        for ch in channels
+    ]
+    trigger_handles = [
+        Line2D([0], [0], color=color_map[pre_key], linestyle="-",
+               linewidth=2.5, label=pre_label)
+    ]
+    trigger_handles += [
+        Line2D([0], [0], color=color_map[t["key"]], linestyle="-",
+               linewidth=float(t.get("lw", 2.5)), label=t.get("label", t["key"]))
+        for t in triggers
+    ]
+
+    leg1 = ax.legend(handles=channel_handles, title="Decay channels",
+                     loc="upper left", frameon=True)
+    ax.add_artist(leg1)
+    ax.legend(handles=trigger_handles, loc="upper right", frameon=True)
+
+    out = {"per_channel": per_ch, "color_map": color_map}
+    return fig, ax, rax, out
+
+
+# ---------------------------------------------------------------------------
+# Yield overlay (multiple samples, single plot)
+# ---------------------------------------------------------------------------
+
+def plot_yield_overlay(
+    dfs, labels, *,
+    var=None,
+    vars=None,
+    weight="w",
+    pre_expr=None,
+    nbins=20, xmin=200.0, xmax=1800.0,
+    cms_year="2024", cms_com="13.6", cms_label_text="Simulation",
+    figsize=(10, 7),
+    xlabel=None,
+    ylabel="Weighted yields",
+    density=False,
+    logy=False,
+):
+    if len(dfs) != len(labels):
+        raise ValueError("dfs and labels must have the same length")
+    if (var is None) == (vars is None):
+        raise ValueError("Provide exactly one of: var='...' (common) OR vars=[...] (per-DF).")
+    if vars is not None and len(vars) != len(dfs):
+        raise ValueError("vars must have the same length as dfs")
+
+    vlist = [var] * len(dfs) if vars is None else list(vars)
+
+    h_ptrs = []
+    for i, df in enumerate(dfs):
+        df_sel = df if (pre_expr is None or str(pre_expr).strip() in ["", "1"]) else df.Filter(pre_expr)
+        vname = vlist[i]
+        cols = set(str(c) for c in df_sel.GetColumnNames())
+        if vname not in cols:
+            sample = sorted(list(cols))[:50]
+            raise RuntimeError(
+                f'Unknown column "{vname}" for dataset "{labels[i]}". '
+                f"First ~50 columns: {sample}"
+            )
+        h_ptrs.append(
+            df_sel.Histo1D(
+                (f"h_{i}", f";{vname};Yields", int(nbins), float(xmin), float(xmax)),
+                vname, weight,
+            )
+        )
+
+    try:
+        ROOT.RDF.RunGraphs(h_ptrs)
+    except Exception:
+        pass
+
+    fig, ax = plt.subplots(figsize=figsize)
+    line_objs = []
+    for i, hptr in enumerate(h_ptrs):
+        H = hptr.GetValue()
+        edges, vals, errs = th1_to_np(H)
+        if density:
+            bw = np.diff(edges)
+            area = float(np.sum(vals * bw))
+            if area > 0:
+                vals = vals / area
+                errs = errs / area
+        (ln,) = ax.step(edges, np.r_[vals, vals[-1]], where="post", linewidth=2.5)
+        line_objs.append(ln)
+
+    ax.set_xlabel(xlabel if xlabel is not None else rf"{(var if var is not None else 'x')} [arb]")
+    ax.set_ylabel("Density" if density else ylabel)
+    if logy:
+        ax.set_yscale("log")
+
+    hep.cms.label(cms_label_text, data=False, ax=ax, year=str(cms_year), com=str(cms_com))
+    ax.legend(line_objs, labels, loc="best", frameon=True)
+    return fig, ax
+
+
+# ---------------------------------------------------------------------------
+# Stacked MC + data overlay  (helpers + main function)
+# ---------------------------------------------------------------------------
+
+def _book_histograms(data_df, mc_items, var, weight, nbins, xmin, xmax):
+    """Book RDataFrame histogram actions for data and MC, run the event loop once."""
+    uid = ROOT.TUUID().AsString().replace("-", "_")
+
+    h_data_ptr = data_df.Histo1D(
+        (f"h_data_{uid}", f";{var};Events", nbins, xmin, xmax), var,
+    )
+    h_mc_ptrs = [
+        item["df"].Histo1D(
+            (f"h_mc_{i}_{uid}", f";{var};Events", nbins, xmin, xmax),
+            var, weight,
+        )
+        for i, item in enumerate(mc_items)
+    ]
+
+    ROOT.RDF.RunGraphs([h_data_ptr] + h_mc_ptrs)
+    return h_data_ptr, h_mc_ptrs
+
+
+def _build_mc_components(h_mc_ptrs, mc_items, sort_by_yield=True):
+    """Convert booked MC histograms to numpy arrays (vals, errs), optionally sorted."""
+    components = []
+    for ptr, item in zip(h_mc_ptrs, mc_items):
+        _, vals_raw, errs_raw = th1_to_np(ptr.GetValue())
+        if np.any(vals_raw < 0):
+            neg_count = np.sum(vals_raw < 0)
+            print(
+                f"  -> WARNING: Plotting '{item['label']}' - found {neg_count} "
+                f"bin(s) with negative yields. Clipping to 0 for the stack."
+            )
+        vals_clipped = np.maximum(vals_raw, 0.0)
+        components.append({
+            "item": item,
+            "vals": vals_clipped,
+            "errs": errs_raw,
+            "yield": float(np.sum(vals_clipped)),
+        })
+
+    if sort_by_yield:
+        components.sort(key=lambda x: x["yield"])
+
+    return components
+
+
+def _draw_mc_stack(ax, centers, widths, mc_components):
+    """Draw the stacked MC bars and return the total stack height per bin."""
+    bottom = np.zeros_like(centers, dtype=float)
+    for comp in mc_components:
+        item = comp["item"]
+        ax.bar(
+            centers, comp["vals"], width=widths, bottom=bottom, align="center",
+            label=item["label"], color=item["color"], alpha=1.0,
+            edgecolor="black", linewidth=0.2,
+        )
+        bottom += comp["vals"]
+    return bottom
+
+
+def _draw_mc_stat_unc(ax, edges, stack_total, mc_components):
+    """Draw hatched MC statistical uncertainty band: sigma = sqrt(sum w^2)."""
+    mc_err2 = np.zeros(len(mc_components[0]["errs"]), dtype=float)
+    for comp in mc_components:
+        mc_err2 += comp["errs"] ** 2
+    mc_err_total = np.sqrt(mc_err2)
+
+    band_lo = np.r_[stack_total - mc_err_total, (stack_total - mc_err_total)[-1]]
+    band_hi = np.r_[stack_total + mc_err_total, (stack_total + mc_err_total)[-1]]
+    ax.fill_between(
+        edges, band_lo, band_hi,
+        step="post", facecolor="none", edgecolor="gray",
+        hatch="////", linewidth=0, label="MC stat. unc.", zorder=5,
+    )
+    return mc_err_total
+
+
+def _draw_data(ax, centers, data_vals, data_errs, label="Data JetMET"):
+    """Draw data points with Poisson error bars."""
+    ax.errorbar(
+        centers, data_vals, yerr=data_errs, fmt="o", color="black",
+        label=label, ms=4, capsize=2, linewidth=1, zorder=10,
+    )
+
+
+def plot_stacked_all_mc(
+    data_df, mc_items, *,
+    var="ak4_pt0", weight="w",
+    nbins=20, xmin=0, xmax=1800,
+    logy=True,
+    sort_mc_by_yield=True,
+):
+    """
+    Stacked MC histogram with data overlay and MC stat. uncertainty band.
+
+    Parameters:
+        data_df  : RDataFrame for data (unweighted)
+        mc_items : list of dicts with keys "df", "label", "color"
+                   (and optionally "weight" column defined as ``weight``)
+        var      : branch name to plot
+        weight   : weight column name (MC only)
+        nbins, xmin, xmax : histogram binning
+        logy     : logarithmic y-axis
+        sort_mc_by_yield : stack rare processes at the bottom
+    """
+    # 1. Book & run histograms
+    h_data_ptr, h_mc_ptrs = _book_histograms(
+        data_df, mc_items, var, weight, nbins, xmin, xmax,
+    )
+
+    # 2. Extract numpy arrays
+    edges, data_vals, data_errs = th1_to_np(h_data_ptr.GetValue())
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    widths = np.diff(edges)
+
+    mc_components = _build_mc_components(h_mc_ptrs, mc_items, sort_by_yield=sort_mc_by_yield)
+
+    # 3. Draw
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    stack_total = _draw_mc_stack(ax, centers, widths, mc_components)
+    _draw_mc_stat_unc(ax, edges, stack_total, mc_components)
+    _draw_data(ax, centers, data_vals, data_errs)
+
+    # 4. Cosmetics
+    ax.set_xlabel(var)
+    ax.set_ylabel("Events")
+    ax.grid(True, axis="y", alpha=0.25)
+    ax.legend(ncol=2)
+
+    if logy:
+        ax.set_yscale("log")
+        ymax = max(
+            float(np.max(stack_total)) if len(stack_total) else 1.0,
+            float(np.max(data_vals)) if len(data_vals) else 1.0,
+        )
+        ax.set_ylim(0.5, max(10.0, 5.0 * ymax))
+
+    return fig, ax
