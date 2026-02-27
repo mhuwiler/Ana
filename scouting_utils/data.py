@@ -48,29 +48,27 @@ SIG = [
 
 GROUPS = {"DY": DY, "TT": TT, "HHbbtt": SIG}
 
-# Cross sections [pb] from GenXSecAnalyzer (1M events, CMSSW_15_0_15)
-# TT: inclusive ttbar xsec from Powheg NLO — all three decay-channel samples
-#     report the same value because the Pythia8-level filtering is invisible
-#     to GenXSecAnalyzer.  Multiply by the W-decay branching ratios for
-#     per-channel normalisation:
-#       BR(W->lnu) = 0.3258,  BR(W->qq') = 0.6741   (PDG 2024)
-#       TTto2L2Nu : xsec * 0.3258^2        = 80.9 pb
-#       TTto4Q    : xsec * 0.6741^2        = 346.3 pb
-#       TTtoLNu2Q : xsec * 2*0.3258*0.6741 = 334.9 pb
-# DY: per-bin xsec after jet matching (amcatnloFXFX)
+_TT_INCLUSIVE_PB = 762.1           
+_BR_W_LNU  = 0.3258              
+_BR_W_QQ   = 0.6741
+
+_SIGMA_GGHH_KL0_FB = 75.76        
+_BR_HH_BBTAUTAU    = 2 * 0.5824 * 0.06272   
+
 XSEC = {
-    # -- TT (Powheg NLO inclusive = 762.1 pb) ---------------------------------
-    "TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8":  762.1,
-    "TTto4Q_TuneCP5_13p6TeV_powheg-pythia8":     762.1,
-    "TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8":  762.1,
-    # -- DY NLO (amcatnloFXFX, binned in pT_ll) ------------------------------
+    # -- TT  (inclusive × BR) ------------------------------------------------
+    "TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8":  _TT_INCLUSIVE_PB * _BR_W_LNU**2,           # 80.9 pb
+    "TTto4Q_TuneCP5_13p6TeV_powheg-pythia8":     _TT_INCLUSIVE_PB * _BR_W_QQ**2,            # 346.3 pb
+    "TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8":  _TT_INCLUSIVE_PB * 2*_BR_W_LNU*_BR_W_QQ,  # 334.9 pb
+    # -- DY NLO  (amcatnloFXFX, binned in pT_ll) ----------------------------
     "DYto2L-2Jets_Bin-2J-MLL-50-PTLL-40to100_TuneCP5_13p6TeV_amcatnloFXFX-pythia8": 170.5,
     "DYto2L-2Jets_Bin-MLL-50-PTLL-100_TuneCP5_13p6TeV_amcatnloFXFX-pythia8":        107.9,
     "DYto2L-2Jets_Bin-MLL-50-PTLL-200_TuneCP5_13p6TeV_amcatnloFXFX-pythia8":         11.13,
     "DYto2L-2Jets_Bin-MLL-50-PTLL-400_TuneCP5_13p6TeV_amcatnloFXFX-pythia8":          0.5914,
     "DYto2L-2Jets_Bin-MLL-50-PTLL-600_TuneCP5_13p6TeV_amcatnloFXFX-pythia8":          0.08008,
-    # -- Signal ---------------------------------------------------------------
-    "GluGluHHto2B2Tau_Par-c2-0p00-kl-0p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8": None,  # TODO: run GenXSecAnalyzer
+    # -- Signal  (LHCHWG NNLO FTapprox × BR) ---------------------------------
+    "GluGluHHto2B2Tau_Par-c2-0p00-kl-0p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8":
+        _SIGMA_GGHH_KL0_FB / 1000.0 * _BR_HH_BBTAUTAU,   # 0.005533 pb  (5.53 fb)
 }
 
 # XCache / DAS settings

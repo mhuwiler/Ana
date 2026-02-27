@@ -348,30 +348,67 @@ def plot_yield_overlay(
 # Stacked MC + data overlay  (helpers + main function)
 # ---------------------------------------------------------------------------
 
+def _get_dfs(item):
+    """Get list of DataFrames from an mc_item (supports 'df' or 'dfs')."""
+    if "dfs" in item:
+        return list(item["dfs"])
+    return [item["df"]]
+
+
 def _book_histograms(data_df, mc_items, var, weight, nbins, xmin, xmax):
-    """Book RDataFrame histogram actions for data and MC, run the event loop once."""
+    """Book RDataFrame histogram actions for data and MC, run the event loop once.
+
+    Each mc_item may contain either a single "df" or a list "dfs".
+    When "dfs" is used, per-sub-df histograms are booked and then summed
+    so that the caller still gets one TH1 per mc_item.
+    data_df may be None (MC-only mode).
+    """
     uid = ROOT.TUUID().AsString().replace("-", "_")
 
-    h_data_ptr = data_df.Histo1D(
-        (f"h_data_{uid}", f";{var};Events", nbins, xmin, xmax), var,
-    )
-    h_mc_ptrs = [
-        item["df"].Histo1D(
-            (f"h_mc_{i}_{uid}", f";{var};Events", nbins, xmin, xmax),
-            var, weight,
+    # Data (optional)
+    h_data_ptr = None
+    if data_df is not None:
+        h_data_ptr = data_df.Histo1D(
+            (f"h_data_{uid}", f";{var};Events", nbins, xmin, xmax), var,
         )
-        for i, item in enumerate(mc_items)
-    ]
 
-    ROOT.RDF.RunGraphs([h_data_ptr] + h_mc_ptrs)
-    return h_data_ptr, h_mc_ptrs
+    # MC — book one histogram per sub-df
+    all_mc_ptrs = []       # flat list of RResultPtrs
+    mc_item_slices = []    # (start, count) per mc_item
+    idx = 0
+    for i, item in enumerate(mc_items):
+        dfs = _get_dfs(item)
+        mc_item_slices.append((idx, len(dfs)))
+        for j, df in enumerate(dfs):
+            ptr = df.Histo1D(
+                (f"h_mc_{i}_{j}_{uid}", f";{var};Events", nbins, xmin, xmax),
+                var, weight,
+            )
+            all_mc_ptrs.append(ptr)
+            idx += 1
+
+    # Run all graphs in one go
+    graphs = list(all_mc_ptrs)
+    if h_data_ptr is not None:
+        graphs.append(h_data_ptr)
+    ROOT.RDF.RunGraphs(graphs)
+
+    # Combine sub-df histograms within each mc_item
+    h_mc_combined = []
+    for start, count in mc_item_slices:
+        combined = all_mc_ptrs[start].GetValue().Clone()
+        for k in range(1, count):
+            combined.Add(all_mc_ptrs[start + k].GetValue())
+        h_mc_combined.append(combined)
+
+    return h_data_ptr, h_mc_combined
 
 
-def _build_mc_components(h_mc_ptrs, mc_items, sort_by_yield=True):
-    """Convert booked MC histograms to numpy arrays (vals, errs), optionally sorted."""
+def _build_mc_components(h_mc_list, mc_items, sort_by_yield=True):
+    """Convert MC histograms (TH1 objects) to numpy arrays (vals, errs), optionally sorted."""
     components = []
-    for ptr, item in zip(h_mc_ptrs, mc_items):
-        _, vals_raw, errs_raw = th1_to_np(ptr.GetValue())
+    for h, item in zip(h_mc_list, mc_items):
+        _, vals_raw, errs_raw = th1_to_np(h)
         if np.any(vals_raw < 0):
             neg_count = np.sum(vals_raw < 0)
             print(
@@ -432,19 +469,20 @@ def _draw_data(ax, centers, data_vals, data_errs, label="Data JetMET"):
 
 
 def plot_stacked_all_mc(
-    data_df, mc_items, *,
+    data_df=None, mc_items=None, *,
     var="ak4_pt0", weight="w",
     nbins=20, xmin=0, xmax=1800,
     logy=True,
     sort_mc_by_yield=True,
 ):
     """
-    Stacked MC histogram with data overlay and MC stat. uncertainty band.
+    Stacked MC histogram with optional data overlay and MC stat. uncertainty band.
 
     Parameters:
-        data_df  : RDataFrame for data (unweighted)
-        mc_items : list of dicts with keys "df", "label", "color"
-                   (and optionally "weight" column defined as ``weight``)
+        data_df  : RDataFrame for data (unweighted), or None for MC-only
+        mc_items : list of dicts with keys ("df" | "dfs"), "label", "color"
+                   Use "df" for a single RDataFrame, or "dfs" for a list of
+                   RDataFrames whose histograms are summed (per-sample normalisation).
         var      : branch name to plot
         weight   : weight column name (MC only)
         nbins, xmin, xmax : histogram binning
@@ -452,23 +490,32 @@ def plot_stacked_all_mc(
         sort_mc_by_yield : stack rare processes at the bottom
     """
     # 1. Book & run histograms
-    h_data_ptr, h_mc_ptrs = _book_histograms(
+    h_data_ptr, h_mc_list = _book_histograms(
         data_df, mc_items, var, weight, nbins, xmin, xmax,
     )
 
     # 2. Extract numpy arrays
-    edges, data_vals, data_errs = th1_to_np(h_data_ptr.GetValue())
+    # Use MC histogram to get bin edges (works even without data)
+    edges_ref = h_mc_list[0] if h_mc_list else None
+    if h_data_ptr is not None:
+        edges, data_vals, data_errs = th1_to_np(h_data_ptr.GetValue())
+    else:
+        edges, _, _ = th1_to_np(edges_ref)
+        data_vals = None
+        data_errs = None
+
     centers = 0.5 * (edges[:-1] + edges[1:])
     widths = np.diff(edges)
 
-    mc_components = _build_mc_components(h_mc_ptrs, mc_items, sort_by_yield=sort_mc_by_yield)
+    mc_components = _build_mc_components(h_mc_list, mc_items, sort_by_yield=sort_mc_by_yield)
 
     # 3. Draw
     fig, ax = plt.subplots(figsize=(8, 6))
 
     stack_total = _draw_mc_stack(ax, centers, widths, mc_components)
     _draw_mc_stat_unc(ax, edges, stack_total, mc_components)
-    _draw_data(ax, centers, data_vals, data_errs)
+    if data_vals is not None:
+        _draw_data(ax, centers, data_vals, data_errs)
 
     # 4. Cosmetics
     ax.set_xlabel(var)
@@ -478,10 +525,9 @@ def plot_stacked_all_mc(
 
     if logy:
         ax.set_yscale("log")
-        ymax = max(
-            float(np.max(stack_total)) if len(stack_total) else 1.0,
-            float(np.max(data_vals)) if len(data_vals) else 1.0,
-        )
+        ymax = float(np.max(stack_total)) if len(stack_total) else 1.0
+        if data_vals is not None:
+            ymax = max(ymax, float(np.max(data_vals)))
         ax.set_ylim(0.5, max(10.0, 5.0 * ymax))
 
     return fig, ax

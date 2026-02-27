@@ -16,7 +16,7 @@ import anaConfig
 from scouting_utils.data import (
     ls_nanoaod_files_groups,
     load_scouting_data,
-    BASE, GROUPS, FILE_SIZE,
+    BASE, GROUPS, XSEC, FILE_SIZE,
 )
 from scouting_utils.triggers import (
     DST_JetHT_expr,
@@ -51,97 +51,93 @@ print("CWD =", os.getcwd())
 print("sys.path[0] =", sys.path[0])
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Load MC samples
-# ──────────────────────────────────────────────────────────────────────────────
+LUMI = 1.0  # fb^-1
 
-group_files, _ = ls_nanoaod_files_groups(
+
+_, group_files_by_sample = ls_nanoaod_files_groups(
     base_dir=BASE,
     groups=GROUPS,
     verbose=0,
 )
 
-dy_df  = ROOT.RDataFrame("Events", group_files["DY"]).Range(FILE_SIZE)
-tt_df  = ROOT.RDataFrame("Events", group_files["TT"]).Range(FILE_SIZE)
-sig_df = ROOT.RDataFrame("Events", group_files["HHbbtt"]).Range(FILE_SIZE)
+# COmment: Add teh ht turn on curve
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Load real data via XCache
-# ──────────────────────────────────────────────────────────────────────────────
+def make_mc_df(files, sample_name):
+    """Create an RDataFrame with weight 'w' normalised to LUMI.
+
+    w_i = genWeight * (xsec_pb * LUMI_fb * 1000) / sum(genWeight)
+    The factor 1000 converts fb^-1 → pb^-1.
+    """
+    df = ROOT.RDataFrame("Events", files).Range(FILE_SIZE)
+    sum_genw = df.Sum("genWeight").GetValue()
+    xsec_pb = XSEC[sample_name]
+    scale = xsec_pb * LUMI * 1000.0 / sum_genw
+    print(f"  {sample_name[:60]:60s}  xsec={xsec_pb:.4g} pb  "
+          f"sum_genw={sum_genw:.4g}  scale={scale:.4e}")
+    return df.Define("w", f"genWeight * {scale:.10e}")
+
+
+print(f"\nNormalising MC to L = {LUMI} fb^-1  (FILE_SIZE = {FILE_SIZE})")
+mc = {}   # sample_name -> RDataFrame (with column "w")
+for group_name, samples_dict in group_files_by_sample.items():
+    print(f"\n[{group_name}]")
+    for sample_name, files in samples_dict.items():
+        mc[sample_name] = make_mc_df(files, sample_name)
+
+# Convenience: lists of sample names per group
+dy_samples  = list(group_files_by_sample["DY"].keys())
+tt_samples  = list(group_files_by_sample["TT"].keys())
+sig_samples = list(group_files_by_sample["HHbbtt"].keys())
+
+
 
 YEARS = ["2024"]
 RUNS = None  # set e.g. ["Run2024C"] for a single run
 
 data_files, data_summary = load_scouting_data(years=YEARS, runs=RUNS)
-data_jetmet_df = ROOT.RDataFrame("Events", data_files).Range(FILE_SIZE)
+data_df = ROOT.RDataFrame("Events", data_files).Range(FILE_SIZE)
 print(f"\nLoaded {len(data_files)} data files into RDataFrame")
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Gen-level definitions (MC only)
-# ──────────────────────────────────────────────────────────────────────────────
 
 gen_decay_expr = (
     "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)"
     .format("GenPart")
 )
 
-dy_df  = dy_df.Define("GenDecay", gen_decay_expr)
-tt_df  = tt_df.Define("GenDecay", gen_decay_expr)
-sig_df = sig_df.Define("GenDecay", gen_decay_expr)
+for name in mc:
+    mc[name] = mc[name].Define("GenDecay", gen_decay_expr)
 
-sig_df = (sig_df
-    .Define("genHbb_idx",       "(int)GenDecay.Htob")
-    .Define("genHtautau_idx",   "(int)GenDecay.Htotau")
-    .Define("genHbb_p4",        "Ana::getP4(genHbb_idx, GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass)")
-    .Define("genHtautau_p4",    "Ana::getP4(genHtautau_idx, GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass)")
-    .Define("gen_mHH",          "(genHbb_p4 + genHtautau_p4).M()")
-    .Define("gen_pt_Hbb",       "genHbb_p4.Pt()")
-    .Define("gen_pt_Htautau",   "genHtautau_p4.Pt()")
-    .Define("gen_eta_Hbb",      "genHbb_p4.Eta()")
-    .Define("gen_eta_Htautau",  "genHtautau_p4.Eta()")
-)
+for name in sig_samples:
+    mc[name] = (mc[name]
+        .Define("genHbb_idx",       "(int)GenDecay.Htob")
+        .Define("genHtautau_idx",   "(int)GenDecay.Htotau")
+        .Define("genHbb_p4",        "Ana::getP4(genHbb_idx, GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass)")
+        .Define("genHtautau_p4",    "Ana::getP4(genHtautau_idx, GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass)")
+        .Define("gen_mHH",          "(genHbb_p4 + genHtautau_p4).M()")
+        .Define("gen_pt_Hbb",       "genHbb_p4.Pt()")
+        .Define("gen_pt_Htautau",   "genHtautau_p4.Pt()")
+        .Define("gen_eta_Hbb",      "genHbb_p4.Eta()")
+        .Define("gen_eta_Htautau",  "genHtautau_p4.Eta()")
+    )
 
-dy_df  = dy_df.Define("w", "genWeight")
-tt_df  = tt_df.Define("w", "genWeight")
-sig_df = sig_df.Define("w", "genWeight")
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# AK4 jet pT columns
-# ──────────────────────────────────────────────────────────────────────────────
-
-for df_name in ["data_jetmet_df", "dy_df", "tt_df", "sig_df"]:
-    df = locals()[df_name]
-    df = (df
+def define_ak4_pt(df):
+    return (df
         .Define("ak4_pt0", "ScoutingPFJetRecluster_pt[0]")
         .Define("ak4_pt1", "ScoutingPFJetRecluster_pt[1]")
         .Define("ak4_pt2", "ScoutingPFJetRecluster_pt[2]")
         .Define("ak4_pt3", "ScoutingPFJetRecluster_pt[3]")
     )
-    locals()[df_name] = df
 
+data_df = define_ak4_pt(data_df)
+for name in mc:
+    mc[name] = define_ak4_pt(mc[name])
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Acceptance cut
-# ──────────────────────────────────────────────────────────────────────────────
 
 base_cut = "ak4_pt0 > 20.0 && ak4_pt1 > 20.0 && ak4_pt2 > 20.0 && ak4_pt3 > 20.0"
 
-data_df_acc = data_jetmet_df.Filter(base_cut)
-dy_df_acc   = dy_df.Filter(base_cut)
-tt_df_acc   = tt_df.Filter(base_cut)
-sig_df_acc  = sig_df.Filter(base_cut)
-
-sig_df_hh = sig_df_acc.Filter("GenDecay.decayType==1")
-sig_df_hm = sig_df_acc.Filter("GenDecay.decayType==2")
-sig_df_he = sig_df_acc.Filter("GenDecay.decayType==3")
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Cutflow + stacked plots per trigger
-# ──────────────────────────────────────────────────────────────────────────────
+data_acc = data_df.Filter(base_cut)
+mc_acc = {name: df.Filter(base_cut) for name, df in mc.items()}
 
 setup_style()
 
@@ -158,35 +154,39 @@ for trig_name, trig in TRIG_LIST:
     print(trig)
     print("=" * 63)
 
-    data_sel = data_df_acc.Filter(trig)
-    dy_sel   = dy_df_acc.Filter(trig)
-    tt_sel   = tt_df_acc.Filter(trig)
-    sig_sel  = sig_df_acc.Filter(trig)
+    # Apply trigger
+    data_sel = data_acc.Filter(trig)
+    mc_sel = {name: df.Filter(trig) for name, df in mc_acc.items()}
 
     # Data: unweighted event count
     data_n = data_sel.Count().GetValue()
 
-    # MC weighted yields
-    dy_y  = dy_sel.Sum("w").GetValue()
-    tt_y  = tt_sel.Sum("w").GetValue()
-    sig_y = sig_sel.Sum("w").GetValue()
+    # MC weighted yields per group
+    def group_yield(samples):
+        y = sum(mc_sel[s].Sum("w").GetValue() for s in samples)
+        yerr = math.sqrt(sum(
+            mc_sel[s].Define("w2", "w*w").Sum("w2").GetValue()
+            for s in samples
+        ))
+        return y, yerr
 
-    dy_yerr  = math.sqrt(dy_sel.Define("w2", "w*w").Sum("w2").GetValue())
-    tt_yerr  = math.sqrt(tt_sel.Define("w2", "w*w").Sum("w2").GetValue())
-    sig_yerr = math.sqrt(sig_sel.Define("w2", "w*w").Sum("w2").GetValue())
+    dy_y,  dy_yerr  = group_yield(dy_samples)
+    tt_y,  tt_yerr  = group_yield(tt_samples)
+    sig_y, sig_yerr = group_yield(sig_samples)
 
     print(f"Data events: {data_n}")
     print(f"DY yield:    {dy_y:.6g} +/- {dy_yerr:.3g}")
     print(f"TT yield:    {tt_y:.6g} +/- {tt_yerr:.3g}")
     print(f"SIG yield:   {sig_y:.6g} +/- {sig_yerr:.3g}")
 
-    hh_sel = sig_sel.Filter("GenDecay.decayType==1")
-    hm_sel = sig_sel.Filter("GenDecay.decayType==2")
-    he_sel = sig_sel.Filter("GenDecay.decayType==3")
+    # Signal decay channels
+    hh = [mc_sel[s].Filter("GenDecay.decayType==1") for s in sig_samples]
+    hm = [mc_sel[s].Filter("GenDecay.decayType==2") for s in sig_samples]
+    he = [mc_sel[s].Filter("GenDecay.decayType==3") for s in sig_samples]
 
-    y_hh = hh_sel.Sum("w").GetValue()
-    y_hm = hm_sel.Sum("w").GetValue()
-    y_he = he_sel.Sum("w").GetValue()
+    y_hh = sum(d.Sum("w").GetValue() for d in hh)
+    y_hm = sum(d.Sum("w").GetValue() for d in hm)
+    y_he = sum(d.Sum("w").GetValue() for d in he)
 
     if abs(sig_y - (y_hh + y_hm + y_he)) > 1e-6 * max(1.0, abs(sig_y)):
         print("WARNING: yield closure mismatch (float/weights?)")
@@ -198,21 +198,22 @@ for trig_name, trig in TRIG_LIST:
     print(f"y_hh:y_hm:y_he: {y_hh:.6g}:{y_hm:.6g}:{y_he:.6g}")
     print()
 
-    # Stacked plot
+    # Stacked plot  (MC only — no data overlay)
     mc_items = [
-        {"df": dy_sel,  "label": "DY",                       "color": "tab:orange"},
-        {"df": tt_sel,  "label": "TT",                       "color": "tab:green"},
-        {"df": hh_sel,  "label": r"$HH\to bb\tau_h\tau_h$",  "color": "tab:red"},
-        {"df": hm_sel,  "label": r"$HH\to bb\tau_e\tau_h$",  "color": "tab:pink"},
-        {"df": he_sel,  "label": r"$HH\to bb\tau_\mu\tau_h$", "color": "tab:purple"},
+        {"dfs": [mc_sel[s] for s in dy_samples],
+         "label": "DY",                        "color": "tab:orange"},
+        {"dfs": [mc_sel[s] for s in tt_samples],
+         "label": "TT",                        "color": "tab:green"},
+        {"dfs": hh, "label": r"$HH\to bb\tau_h\tau_h$",   "color": "tab:red"},
+        {"dfs": hm, "label": r"$HH\to bb\tau_e\tau_h$",   "color": "tab:pink"},
+        {"dfs": he, "label": r"$HH\to bb\tau_\mu\tau_h$",  "color": "tab:purple"},
     ]
 
     fig, ax = plot_stacked_all_mc(
-        data_df=data_sel,
         mc_items=mc_items,
         var="ak4_pt0",
         weight="w",
-        nbins=20, xmin=0, xmax=1800,
+        nbins=36, xmin=0, xmax=1800,
         logy=True,
     )
 
