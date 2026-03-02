@@ -575,6 +575,13 @@ namespace Ana
 	}
 
 
+	bool isQuark(int id) 
+	{
+		std::vector<int> quarks = {1, 2, 3, 4, 5, 6}; 
+		return (std::find(quarks.begin(), quarks.end(), abs(id)) != quarks.end()); 
+	}
+
+
 	GenMatchingResult DecayGenMatchingVBF(const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& mother, const ROOT::VecOps::RVec<int>& statusFlag) 
 	{
 
@@ -595,6 +602,8 @@ namespace Ana
     	electrons.reserve(1); 
     	std::vector<int> Higgstob; 
     	Higgstob.reserve(1); 
+    	std::vector<int> VBFquarks; 
+    	VBFquarks.reserve(2); 
 
 
     	GenMatchingResult result; 
@@ -769,6 +778,17 @@ namespace Ana
 	    	}
 	    	if (taus.size() == 2) result.decayType = TauhTauh; 
 		}
+
+		// Finding the VBF initiating quarks 
+		for (unsigned int i=0; i<id.size(); i++) 
+		{
+			if (isQuark(id[i]) && isHardProcess(statusFlag[i]) && isLastCopy(statusFlag[i])) // This could be the VBF jet, if it is a quark, part of the hard process 
+			{
+				VBFquarks.push_back(i); 
+			}
+		}
+
+		// Now we need to check that they match a delta R and mjj requirement 
 
 
 		if (result.decayType == TauhTauh) 
