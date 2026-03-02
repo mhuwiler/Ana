@@ -83,6 +83,10 @@ def AdditionalVariables(sample):
 	sample = sample.Define("{}_{}_Xbb{}".format("FatJet", anaConfig.tauIDvar, "vsQCD"), "{0}_{1}_Xbb/({0}_{1}_QCD+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar))
 	sample = sample.Define("{}_{}_Xbb{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTop"), "{0}_{1}_Xbb/({0}_{1}_QCD+{0}_{1}_Xbb+{0}_{1}_Top)".format("FatJet", anaConfig.tauIDvar))
 
+	sample = sample.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsbb"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar))
+	sample = sample.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsbb"), "{0}_{1}_Xtauhtaum/({0}_{1}_Xtauhtaum+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar))
+	sample = sample.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsbb"), "{0}_{1}_Xtauhtaue/({0}_{1}_Xtauhtaue+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar))
+
 	# TODO: add those variables https://github.com/LPC-HH/bbtautau/blob/591d8d1acea32896ef652157d5547ffccd861130/src/bbtautau/processors/objects.py#L75
 
 
@@ -199,12 +203,13 @@ if __name__ == "__main__":
 	
 
 	# TODO: try out taking the max from tauhtauh,tauhtaumu, tauhtaue
-	sig = sig.Define("{}_{}_tautau".format("FatJet", anaConfig.tauIDvar), "{0}_{1}_Xtauhtaum+{0}_{1}_Xtauhtauh+{0}_{1}_Xtauhtaue".format("FatJet", anaConfig.tauIDvar))
-	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_Xtauhtaum".format(anaConfig.tauIDvar)))
+	differentialTagger = "vsbb" #vsQCDTop
+	sig = sig.Define("{}_{}_tautau{}".format("FatJet", anaConfig.tauIDvar, differentialTagger), "{0}_{1}_Xtauhtaum{2}+{0}_{1}_Xtauhtauh{2}+{0}_{1}_Xtauhtaue{2}".format("FatJet", anaConfig.tauIDvar, differentialTagger))
+	sig = sig.Define("TheTauFatJet", "Ana::RecoTauJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1})".format("FatJet", "{}_tautau{}".format(anaConfig.tauIDvar, differentialTagger)))
 	#sig = sig.Define("TheTauFatJet", "1")
 	#sig = sig.Define("ThebFatJet", "0")
 
-	sig = sig.Define("ThebFatJet", "Ana::RecoBJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1}, TheTauFatJet)".format("FatJet", "{}_Xbb".format(anaConfig.tauIDvar)))
+	sig = sig.Define("ThebFatJet", "Ana::RecoBJet( {0}_pt, {0}_eta, {0}_phi, {0}_{1}, TheTauFatJet)".format("FatJet", "{}_Xbb{}".format(anaConfig.tauIDvar, "vsQCD")))
 	#sig = sig.Define("TheTauFatJet", "1-ThebFatJet")
 
 	sig = sig.Define("TheTauFatJet_eta", "Ana::overflowProtected(FatJet_eta, TheTauFatJet)").Define("TheTauFatJet_phi", "Ana::overflowProtected(FatJet_phi, TheTauFatJet)")
