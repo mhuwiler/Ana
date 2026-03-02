@@ -651,7 +651,7 @@ namespace Ana
 
 
 				std::vector<int> otherTaus = findDescendants(localHiggses[0], "Tau", id, mother, statusFlag, hardProcess); 
-				std::cout << "N taus: " << otherTaus.size() << std::endl; 
+				//std::cout << "N taus: " << otherTaus.size() << std::endl; 
 				/*for (auto element : otherTaus) 
 				{
 					std::string text = RevertPDGid(id[element]); 
@@ -702,7 +702,7 @@ namespace Ana
 
 
 				std::vector<int> otherTaus = findDescendants(localHiggses[0], "Tau", id, mother, statusFlag, hardProcess); 
-				std::cout << "N taus: " << otherTaus.size() << std::endl; 
+				//std::cout << "N taus: " << otherTaus.size() << std::endl; 
 				/*for (auto element : otherTaus) 
 				{
 					std::string text = RevertPDGid(id[element]); 
@@ -778,17 +778,6 @@ namespace Ana
 	    	if (taus.size() == 2) result.decayType = TauhTauh; 
 		}
 
-		// Finding the VBF initiating quarks 
-		for (unsigned int i=0; i<id.size(); i++) 
-		{
-			if (isQuark(id[i]) && isHardProcess(statusFlag[i]) && isLastCopy(statusFlag[i])) // This could be the VBF jet, if it is a quark, part of the hard process 
-			{
-				VBFquarks.push_back(i); 
-			}
-		}
-
-		// Now we need to check that they match a delta R and mjj requirement 
-
 
 		if (result.decayType == TauhTauh) 
 		{
@@ -821,6 +810,17 @@ namespace Ana
 
 		// TODO: add VBF gen particle selection 
 
+		// Finding the VBF initiating quarks 
+		for (unsigned int i=0; i<id.size(); i++) 
+		{
+			if (isQuark(id[i]) && fromHardProcess(statusFlag[i]) && isLastCopy(statusFlag[i])) // This could be the VBF jet, if it is a quark, part of the hard process 
+			{
+				if ((i != result.b1) && (i != result.b2)) VBFquarks.push_back(i); 
+			}
+		}
+		std::cout << "N VBF jets: " << VBFquarks.size() << std::endl; 
+
+		// Now we need to check that they match a delta R and mjj requirement 
 		
 
 		return result; 
@@ -864,10 +864,10 @@ namespace Ana
 
 		double deltaEtaThres = 3.;
 
-		TLorentzVector b1 = getP4(genDecay.b1, pt, eta, phi, mass); 
-		TLorentzVector b2 = getP4(genDecay.b2, pt, eta, phi, mass); 
-		TLorentzVector tau1 = getP4(genDecay.tau1, pt, eta, phi, mass); 
-		TLorentzVector tau2 = getP4(genDecay.tau2, pt, eta, phi, mass); 
+		TLorentzVector b1 = getP4(genDecay.b1, genPt, genEta, genPhi, genMass); 
+		TLorentzVector b2 = getP4(genDecay.b2, genPt, genEta, genPhi, genMass); 
+		TLorentzVector tau1 = getP4(genDecay.tau1, genPt, genEta, genPhi, genMass); 
+		TLorentzVector tau2 = getP4(genDecay.tau2, genPt, genEta, genPhi, genMass); 
 
 
 		TLorentzVector jet1, jet2; 

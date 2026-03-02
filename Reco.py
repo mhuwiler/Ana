@@ -241,6 +241,7 @@ if __name__ == "__main__":
 
 
 	gensig = sig.Define("GenDecay", "Ana::DecayGenMatchingVBF({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)".format("GenPart"))
+	gensig = gensig.Define("VBFGenDecay", "Ana::MatchVBFJets(GenDecay, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenJet", "GenPart"))
 
 	gensig = gensig.Define("GenMatchedTauFatJet", "Ana::closestMatch(GenDecay.Htotau, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenPart", "FatJet"))
 	gensig = gensig.Define("GenMatchedbFatJet", "Ana::closestMatch(GenDecay.Htob, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenPart", "FatJet"))
