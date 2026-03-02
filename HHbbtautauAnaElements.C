@@ -1074,7 +1074,7 @@ namespace Ana
 
 			float currentdR = P4.DeltaR(gen); 
 
-			std::cout << "Matching dr: " << currentdR << std::endl; 
+			//std::cout << "Matching dr: " << currentdR << std::endl; 
 
 			if ((currentdR < dR) && (currentdR > matchingAboveThres))
 			{
