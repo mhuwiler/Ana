@@ -1197,7 +1197,7 @@ namespace Ana
 		assert(mass.size() == nJets); 
 
 		// Muon selection requirements 
-		double ptThres = 200.; 
+		double ptThres = 50.; 
 		double etaThres = 2.4; 
 		double idThres = 0.5; 
 		
@@ -1247,7 +1247,7 @@ namespace Ana
 		assert(mass.size() == nJets); 
 
 		// Muon selection requirements 
-		double ptThres = 200.; 
+		double ptThres = 50.; 
 		double etaThres = 2.4; 
 		double idThres = 0.3; 
 		
