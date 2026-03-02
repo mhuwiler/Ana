@@ -264,6 +264,12 @@ namespace Ana
 		return flag & (1u << 8); 
 	}
 
+	bool isQuark(int id) 
+	{
+		std::vector<int> quarks = {1, 2, 3, 4, 5, 6}; 
+		return (std::find(quarks.begin(), quarks.end(), abs(id)) != quarks.end()); 
+	}
+
 
 	std::vector<int> findMothers(int particle, int motherId, const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& mothers, const ROOT::VecOps::RVec<int>& statusFlags, const long int flag = -999.) 
 	{
@@ -413,15 +419,15 @@ namespace Ana
 
 				std::vector<int> otherTaus = findDescendants(localHiggses[0], "Tau", id, mother, statusFlag, hardProcess); 
 				//std::cout << "N taus: " << otherTaus.size() << std::endl; 
-				for (auto element : otherTaus) 
+				/*for (auto element : otherTaus) 
 				{
 					std::string text = RevertPDGid(id[element]); 
 					/*for (auto it = PDGid.begin(); it != PDGid.end(); it++) 
 					{
 						if (it->second == element) text = it->first; 
-					}*/
+					}
 					//std::cout << text << ": " << id[element] << " (id), " << RevertPDGid(id[mother[element]]) << " (mother = " << id[mother[element]] << "), " << statusFlag[element] << " (status)" << std::endl; 
-				}
+				}*/
 				otherTaus.erase(std::remove(otherTaus.begin(), otherTaus.end(), localtaus.at(0)), otherTaus.end()); // Remove the muonic tau
 				bool notTauh = false; 
 				for (unsigned int j=0; j<otherTaus.size(); j++) // Make sure the other tau decay is not electronic
@@ -464,15 +470,15 @@ namespace Ana
 
 				std::vector<int> otherTaus = findDescendants(localHiggses[0], "Tau", id, mother, statusFlag, hardProcess); 
 				//std::cout << "N taus: " << otherTaus.size() << std::endl; 
-				for (auto element : otherTaus) 
+				/*for (auto element : otherTaus) 
 				{
 					std::string text = RevertPDGid(id[element]); 
 					/*for (auto it = PDGid.begin(); it != PDGid.end(); it++) 
 					{
 						if (it->second == element) text = it->first; 
-					}*/
-					//std::cout << text << ": " << id[element] << " (id), " << RevertPDGid(id[mother[element]]) << " (mother = " << id[mother[element]] << "), " << statusFlag[element] << " (status)" << std::endl; 
-				}
+					}
+					std::cout << text << ": " << id[element] << " (id), " << RevertPDGid(id[mother[element]]) << " (mother = " << id[mother[element]] << "), " << statusFlag[element] << " (status)" << std::endl; 
+				}*/
 				otherTaus.erase(std::remove(otherTaus.begin(), otherTaus.end(), localtaus.at(0)), otherTaus.end()); // Remove the muonic tau
 				bool notTauh = false; 
 				for (unsigned int j=0; j<otherTaus.size(); j++) // Make sure the other tau decay is not electronic
@@ -575,13 +581,6 @@ namespace Ana
 	}
 
 
-	bool isQuark(int id) 
-	{
-		std::vector<int> quarks = {1, 2, 3, 4, 5, 6}; 
-		return (std::find(quarks.begin(), quarks.end(), abs(id)) != quarks.end()); 
-	}
-
-
 	GenMatchingResult DecayGenMatchingVBF(const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& mother, const ROOT::VecOps::RVec<int>& statusFlag) 
 	{
 
@@ -653,15 +652,15 @@ namespace Ana
 
 				std::vector<int> otherTaus = findDescendants(localHiggses[0], "Tau", id, mother, statusFlag, hardProcess); 
 				std::cout << "N taus: " << otherTaus.size() << std::endl; 
-				for (auto element : otherTaus) 
+				/*for (auto element : otherTaus) 
 				{
 					std::string text = RevertPDGid(id[element]); 
 					/*for (auto it = PDGid.begin(); it != PDGid.end(); it++) 
 					{
 						if (it->second == element) text = it->first; 
-					}*/
+					}
 					std::cout << text << ": " << id[element] << " (id), " << RevertPDGid(id[mother[element]]) << " (mother = " << id[mother[element]] << "), " << statusFlag[element] << " (status)" << std::endl; 
-				}
+				}*/
 				otherTaus.erase(std::remove(otherTaus.begin(), otherTaus.end(), localtaus.at(0)), otherTaus.end()); // Remove the muonic tau
 				bool notTauh = false; 
 				for (unsigned int j=0; j<otherTaus.size(); j++) // Make sure the other tau decay is not electronic
@@ -704,15 +703,15 @@ namespace Ana
 
 				std::vector<int> otherTaus = findDescendants(localHiggses[0], "Tau", id, mother, statusFlag, hardProcess); 
 				std::cout << "N taus: " << otherTaus.size() << std::endl; 
-				for (auto element : otherTaus) 
+				/*for (auto element : otherTaus) 
 				{
 					std::string text = RevertPDGid(id[element]); 
 					/*for (auto it = PDGid.begin(); it != PDGid.end(); it++) 
 					{
 						if (it->second == element) text = it->first; 
-					}*/
+					}
 					std::cout << text << ": " << id[element] << " (id), " << RevertPDGid(id[mother[element]]) << " (mother = " << id[mother[element]] << "), " << statusFlag[element] << " (status)" << std::endl; 
-				}
+				}*/
 				otherTaus.erase(std::remove(otherTaus.begin(), otherTaus.end(), localtaus.at(0)), otherTaus.end()); // Remove the muonic tau
 				bool notTauh = false; 
 				for (unsigned int j=0; j<otherTaus.size(); j++) // Make sure the other tau decay is not electronic
