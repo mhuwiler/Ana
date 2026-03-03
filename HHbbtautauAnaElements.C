@@ -270,6 +270,16 @@ namespace Ana
 		return (std::find(quarks.begin(), quarks.end(), abs(id)) != quarks.end()); 
 	}
 
+	bool isLastCopyBeforeFSR(int flags) 
+	{
+    	return flags & (1u << 14);
+	}
+
+	bool isFirstCopy(int flags) 
+	{
+    	return flags & (1u << 12);
+	}
+
 
 	std::vector<int> findMothers(int particle, int motherId, const ROOT::VecOps::RVec<float>& id, const ROOT::VecOps::RVec<float>& mothers, const ROOT::VecOps::RVec<int>& statusFlags, const long int flag = -999.) 
 	{
@@ -813,7 +823,7 @@ namespace Ana
 		// Finding the VBF initiating quarks 
 		for (unsigned int i=0; i<id.size(); i++) 
 		{
-			if (isQuark(id[i]) && fromHardProcess(statusFlag[i]) && isLastCopy(statusFlag[i])) // This could be the VBF jet, if it is a quark, part of the hard process 
+			if (isQuark(id[i]) && fromHardProcess(statusFlag[i]) && isLastCopyBeforeFSR(statusFlag[i])) // This could be the VBF jet, if it is a quark, part of the hard process (isLastCopyBeforeFSR(statusFlag[i]) || (isLastCopy(statusFlag[i]) && isFirstCopy(statusFlag[i])))
 			{
 				if ((i != result.b1) && (i != result.b2)) VBFquarks.push_back(i); 
 			}
