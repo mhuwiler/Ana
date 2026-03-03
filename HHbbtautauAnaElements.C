@@ -823,7 +823,7 @@ namespace Ana
 		// Finding the VBF initiating quarks 
 		for (unsigned int i=0; i<id.size(); i++) 
 		{
-			if (isQuark(id[i]) && fromHardProcess(statusFlag[i]) && isLastCopyBeforeFSR(statusFlag[i])) // This could be the VBF jet, if it is a quark, part of the hard process (isLastCopyBeforeFSR(statusFlag[i]) || (isLastCopy(statusFlag[i]) && isFirstCopy(statusFlag[i])))
+			if (isQuark(id[i]) && fromHardProcess(statusFlag[i]) && isLastCopy(statusFlag[i])) // This could be the VBF jet, if it is a quark, part of the hard process (isLastCopyBeforeFSR(statusFlag[i]) || (isLastCopy(statusFlag[i]) && isFirstCopy(statusFlag[i])))
 			{
 				if ((i != result.b1) && (i != result.b2)) VBFquarks.push_back(i); 
 			}

@@ -140,8 +140,8 @@ def ApplyTriggerSelection(sample):
 			activetriggers.append(path)
 
 
-	triggerselection = "||".join(activetriggers)
-	print("Trigger selection: {}".format(triggerselection))
+	triggerselection = " || ".join(activetriggers)
+	print("\nTrigger selection: {}\n".format(triggerselection))
 
 
 	sample = sample.Filter(triggerselection)
@@ -179,7 +179,7 @@ if __name__ == "__main__":
 	#ROOT.gSystem.Load("MyDict.so")
 	
 
-	sig = loadFile("VBFBoostedPrivate")
+	sig = loadFile("ggfBoostedPrivate")
 
 	if (options.test): 
 		sig = generalise(sig.Range(0, 500000))
@@ -240,7 +240,7 @@ if __name__ == "__main__":
 	cutflow.Add("no overlap b tau", sig.Count().GetValue())
 
 
-	gensig = sig.Define("GenDecay", "Ana::DecayGenMatchingVBF({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)".format("GenPart"))
+	gensig = sig.Define("GenDecay", "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)".format("GenPart"))
 	gensig = gensig.Define("VBFGenDecay", "Ana::MatchVBFJets(GenDecay, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenJet", "GenPart"))
 
 	gensig = gensig.Define("GenMatchedTauFatJet", "Ana::closestMatch(GenDecay.Htotau, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("GenPart", "FatJet"))
