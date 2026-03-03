@@ -136,12 +136,12 @@ def ApplyTriggerSelection(sample):
 
 	for path in triggers: # check which triggers exist in the sample
 		if ((path in branches)): 
-			print(path)
+			#print(path)
 			activetriggers.append(path)
 
 
 	triggerselection = "||".join(activetriggers)
-	print(triggerselection)
+	print("Trigger selection: {}".format(triggerselection))
 
 
 	sample = sample.Filter(triggerselection)
