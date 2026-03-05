@@ -1184,7 +1184,7 @@ namespace Ana
 			double localdR = gen.DeltaR(candidate); 
 
 			if (localdR < dR) dR = localdR; 
-			std::cout << dR << std::endl; 
+			//std::cout << dR << std::endl; 
 
 		}
 		

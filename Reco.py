@@ -90,6 +90,7 @@ def AdditionalVariables(sample):
 	sample = sample.Define("{}_{}_Xtauhtaum{}".format("FatJet", anaConfig.tauIDvar, "vsbb"), "{0}_{1}_Xtauhtaum/({0}_{1}_Xtauhtaum+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar))
 	sample = sample.Define("{}_{}_Xtauhtaue{}".format("FatJet", anaConfig.tauIDvar, "vsbb"), "{0}_{1}_Xtauhtaue/({0}_{1}_Xtauhtaue+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar))
 	sample = sample.Define("{}_{}_Xtautau{}".format("FatJet", anaConfig.tauIDvar, "vsbb"), "{0}_{1}_Xtauhtaum{2}+{0}_{1}_Xtauhtauh{2}+{0}_{1}_Xtauhtaue{2}".format("FatJet", anaConfig.tauIDvar, "vsbb"))
+	sample = sample.Define("{}_{}_Xtautau{}bis".format("FatJet", anaConfig.tauIDvar, "vsbb"), "{0}_{1}_Xtautau/({0}_{1}_Xtautau+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar, "vsbb"))
 
 
 	sample = sample.Define("{}_{}_Xtauhtauh{}".format("FatJet", anaConfig.tauIDvar, "vsQCDTopbb"), "{0}_{1}_Xtauhtauh/({0}_{1}_Xtauhtauh+{0}_{1}_QCD+{0}_{1}_Top+{0}_{1}_Xbb)".format("FatJet", anaConfig.tauIDvar))
