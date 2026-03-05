@@ -1183,7 +1183,8 @@ namespace Ana
 
 			double localdR = gen.DeltaR(candidate); 
 
-			if (localdR > dR) dR = localdR; 
+			if (localdR < dR) dR = localdR; 
+			std::cout << dR << std::endl; 
 
 		}
 		
@@ -1409,8 +1410,7 @@ namespace Ana
 
 
 
-		std::vector<int> result; 
-		result.reserve(2); 
+		//result.reserve(2); 
 
 
 
@@ -1456,7 +1456,10 @@ namespace Ana
 
 		}
 
-		return {jetIdx1, jetIdx2}; 
+		std::vector<int> result = {jetIdx1, jetIdx2}; 
+		//std::cout << result.size() << std::endl; 
+
+		return result; 
 
 	}
 
