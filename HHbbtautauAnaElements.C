@@ -1164,6 +1164,34 @@ namespace Ana
 		return dR; 
 	}
 
+	float deltaR(int genParticle, const ROOT::VecOps::RVec<float>& genPt, const ROOT::VecOps::RVec<float>& genEta, const ROOT::VecOps::RVec<float>& genPhi, const ROOT::VecOps::RVec<float>& genMass, const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& m, const std::vector<int> cands) 
+	{
+		double genpt = overflowProtected(genPt, genParticle); 
+		if (genpt < 0.) return genpt; 
+
+		TLorentzVector gen, candidate; 
+		gen.SetPtEtaPhiM(genpt, overflowProtected(genEta, genParticle), overflowProtected(genPhi, genParticle), overflowProtected(genMass, genParticle)); 
+			
+
+		float dR = 999.; 
+
+		for (auto cand : cands) 
+		{
+			double candpt = overflowProtected(pt, cand); 
+			if (candpt < 0.) continue; // If gen particle is out of bounds, return default overflow value
+			candidate.SetPtEtaPhiM(candpt, eta[cand], phi[cand], m[cand]); 	
+
+			double localdR = gen.DeltaR(candidate); 
+
+			if (localdR > dR) dR = localdR; 
+
+		}
+		
+		if (dR == 999.) return defaultValue<float>(); 
+
+		return dR; 
+	}
+
 
 	inline double deltaPhi(double phi1, double phi2)
 	{
@@ -1352,6 +1380,84 @@ namespace Ana
 		}
 
 		return electron; 
+	}
+
+
+	std::vector<int> RecoVBFJets(const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& mass, const ROOT::VecOps::RVec<float>& id) 
+	{
+		int n = pt.size(); 
+
+		// Selection requirements
+		double ptThres = 20.; 
+		double etaThres = 5.; 
+
+		double isoThres = 0.4; 
+
+		double diJetMassThres = 300.; 
+
+		double deltaEtaThres = 3.;
+
+
+		// Local variables 
+		TLorentzVector jet1, jet2; 
+
+
+		double diJetMass = -999.; 
+
+		int jetIdx1 = -999; 
+		int jetIdx2 = -999; 
+
+
+
+		std::vector<int> result; 
+		result.reserve(2); 
+
+
+
+		for (unsigned int i=0; i<n; i++) 
+		{
+			// VBF jet selection requirements 
+			if (pt[i] < ptThres) continue; 
+			if (eta[i] > etaThres) continue; 
+
+			jet1.SetPtEtaPhiM(pt[i], eta[i], phi[i], mass[i]); 
+
+
+			for (unsigned int j=i; j<n; j++) 
+			{
+				if (j == i) continue; 
+
+				// VBF jet selection requirements 
+				if (pt[i] < ptThres) continue; 
+				if (eta[i] > etaThres) continue; 
+
+				jet2.SetPtEtaPhiM(pt[j], eta[j], phi[j], mass[j]); 
+
+				// Both jets pass the VBF jet preselection requirements and do not overlap wth the Higgs decay products 
+
+
+				double currentDiJetMass = (jet1 + jet2).M(); 
+
+				// Selection on jet pair
+				if (currentDiJetMass < diJetMassThres) continue; 
+				if (abs(jet1.Eta() - jet2.Eta()) < deltaEtaThres) continue;
+				if (jet1.Eta()*jet2.Eta() > 0.) continue;
+
+				if (currentDiJetMass > diJetMass) 
+				{
+					diJetMass = currentDiJetMass; 
+
+					jetIdx1 = i; 
+					jetIdx2 = j; 
+				}
+
+
+			}
+
+		}
+
+		return {jetIdx1, jetIdx2}; 
+
 	}
 
 

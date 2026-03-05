@@ -228,6 +228,8 @@ if __name__ == "__main__":
 	#sig = sig.Define("TheTauFatJet_eta", "Ana::overflowProtected(FatJet_eta, TheTauFatJet)").Define("TheTauFatJet_phi", "Ana::overflowProtected(FatJet_phi, TheTauFatJet)")
 	sig = sig.Define("TheMuon", "Ana::RecoMuon( {0}_pt, {0}_eta, {0}_phi, {0}_tightId, {0}_dz, {0}_dxy, {1}_eta, {1}_phi)".format("Muon", "TheTauFatJet"))
 
+	sig = sig.Define("VBFJets", "Ana::RecoVBFJets({0}_pt, {0}_eta, {0}_phi, {0}_mass, {0}_btagDeepFlavB)".format("Jet"))
+
 
 	
 
@@ -258,6 +260,10 @@ if __name__ == "__main__":
 	gensig = gensig.Define("dR_reco_bb_closest", "Ana::deltaR(ClosestFatJettoGenMatchedbFatJet, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {0}_pt, {0}_eta, {0}_phi, {0}_mass, GenMatchedbFatJet)".format("FatJet"))
 	gensig = gensig.Define("ClosestJettoGenMatchedbFatJet", "Ana::closestMatchAboveThreshold(GenMatchedbFatJet, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass)".format("FatJet", "Jet"))
 	gensig = gensig.Define("dR_reco_bb_closest_jet", "Ana::deltaR(ClosestJettoGenMatchedbFatJet, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, GenMatchedbFatJet)".format("FatJet", "Jet"))
+
+	gensig = gensig.Define("dR_gen_reco_VBFjet1", "Ana::deltaR(GenDecay.VBFgenJet1, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, VBFJets)".format("GenPart", "Jet"))
+	gensig = gensig.Define("dR_gen_reco_VBFjet2", "Ana::deltaR(GenDecay.VBFgenJet2, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, VBFJets)".format("GenPart", "Jet"))
+
 
 
 	gensig = DefineTauTaggerVarsForJet("GenMatchedTauFatJet", gensig)
