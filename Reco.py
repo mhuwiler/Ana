@@ -265,6 +265,8 @@ if __name__ == "__main__":
 	gensig = gensig.Define("dR_gen_reco_VBFjet1", "Ana::deltaR(VBFGenDecay.VBFgenJet1, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, VBFJets)".format("GenJet", "Jet"))
 	gensig = gensig.Define("dR_gen_reco_VBFjet2", "Ana::deltaR(VBFGenDecay.VBFgenJet2, {0}_pt, {0}_eta, {0}_phi, {0}_mass, {1}_pt, {1}_eta, {1}_phi, {1}_mass, VBFJets)".format("GenJet", "Jet"))
 
+	gensig = gensig.Define("VBFmjj", "Ana::VBFdiJetMass(VBFGenDecay.VBFgenJet1, VBFGenDecay.VBFgenJet2, {0}_pt, {0}_eta, {0}_phi, {0}_mass)".format("Jet"))
+
 
 
 	gensig = DefineTauTaggerVarsForJet("GenMatchedTauFatJet", gensig)

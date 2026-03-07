@@ -1464,6 +1464,22 @@ namespace Ana
 	}
 
 
+	double VBFdiJetMass(const int jet1, const int jet2, const ROOT::VecOps::RVec<float>& pt, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi, const ROOT::VecOps::RVec<float>& mass) 
+	{
+		double result = defaultValue<double>();
+
+		TLorentzVector J1, J2; 
+		J1.SetPtEtaPhiM(overflowProtected(pt, jet1), overflowProtected(eta, jet1), overflowProtected(phi, jet1), overflowProtected(mass, jet1)); 
+		J2.SetPtEtaPhiM(overflowProtected(pt, jet2), overflowProtected(eta, jet2), overflowProtected(phi, jet2), overflowProtected(mass, jet2)); 
+
+		TLorentzVector invariantMass = J1 + J2; 
+
+		if (invariantMass.M() > 0) result = invariantMass.M(); 
+
+		return result;  
+	}
+
+
 
 	void AddColumn(ROOT::RDF::RNode* df, const std::string &newColName) {
     	*df = df->Define(newColName, [](){ return 42; });
