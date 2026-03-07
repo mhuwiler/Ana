@@ -1480,6 +1480,16 @@ namespace Ana
 	}
 
 
+	double VBFdeltaR(const int jet1, const int jet2, const ROOT::VecOps::RVec<float>& eta, const ROOT::VecOps::RVec<float>& phi) 
+	{
+		double result = defaultValue<double>();
+
+		result = deltaR(overflowProtected(eta, jet1), overflowProtected(phi, jet1), overflowProtected(eta, jet2), overflowProtected(phi, jet2)); 
+
+		return result;  
+	}
+
+
 
 	void AddColumn(ROOT::RDF::RNode* df, const std::string &newColName) {
     	*df = df->Define(newColName, [](){ return 42; });
