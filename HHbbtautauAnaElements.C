@@ -1205,6 +1205,8 @@ namespace Ana
 
 	inline double deltaR(double eta1, double phi1, double eta2, double phi2)
 	{
+		double def = defaultValue<double>(); 
+		if ((eta1 == def) || (eta2 == def) || (phi1 == def) || (phi2 == def)) return def; 
 	    const double dEta = eta1 - eta2;
 	    const double dPhi = deltaPhi(phi1, phi2);
 	    return std::sqrt(dEta * dEta + dPhi * dPhi);
