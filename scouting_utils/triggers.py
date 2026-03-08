@@ -53,6 +53,7 @@ PARKING_HH_BITS = [
     "HLT_PFHT400_SixPFJet32_PNet2BTagMean0p50",
     "HLT_PFHT450_SixPFJet36",
     "HLT_PFHT450_SixPFJet36_PNetBTag0p35",
+    # TODO: Add VBF parking triggers too
 ]
 
 

@@ -3,12 +3,27 @@
 Cutflow & Trigger Efficiency analysis script.
 
 Usage:
-    python cutflow_TrigEff.py
+    python cutflow_TrigEff.py               # skip existing plots
+    python cutflow_TrigEff.py --overwrite   # regenerate all plots
 """
 
 import os
 import sys
+import argparse
 import math
+import resource
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--overwrite", action="store_true",
+                    help="Overwrite existing plots instead of skipping them")
+parser.add_argument("--theme", choices=["light", "dark"], default="light",
+                    help="Plot colour theme (default: light)")
+ARGS = parser.parse_args()
+
+# Increase stack size to 64 MB to prevent stack overflow from deep
+# RDataFrame Define/Filter chains with large TChains.
+STACK_SIZE = 64 * 1024 * 1024  # 64 MB
+resource.setrlimit(resource.RLIMIT_STACK, (STACK_SIZE, resource.RLIM_INFINITY))
 
 import ROOT
 import anaConfig
@@ -45,7 +60,7 @@ ROOT.gROOT.LoadMacro("Particle.h+")
 ROOT.gROOT.LoadMacro("HHbbtautauAnaElements.C+")
 
 ROOT.gErrorIgnoreLevel = ROOT.kInfo
-# ROOT.ROOT.DisableImplicitMT()
+ROOT.ROOT.EnableImplicitMT(32)  # use 32 threads for RDataFrame parallelism
 
 print("CWD =", os.getcwd())
 print("sys.path[0] =", sys.path[0])
@@ -69,7 +84,14 @@ def make_mc_df(files, sample_name):
     w_i = genWeight * (xsec_pb * LUMI_fb * 1000) / sum(genWeight)
     The factor 1000 converts fb^-1 → pb^-1.
     """
-    df = ROOT.RDataFrame("Events", files).Range(FILE_SIZE)
+    # Filter out missing files to avoid RDataFrame constructor failure
+    good_files = [f for f in files if os.path.isfile(f)]
+    if len(good_files) < len(files):
+        print(f"  WARNING: {len(files) - len(good_files)} missing file(s) "
+              f"in {sample_name}, using {len(good_files)}/{len(files)}")
+    if not good_files:
+        raise FileNotFoundError(f"No valid files for {sample_name}")
+    df = ROOT.RDataFrame("Events", good_files)
     sum_genw = df.Sum("genWeight").GetValue()
     xsec_pb = XSEC[sample_name]
     scale = xsec_pb * LUMI * 1000.0 / sum_genw
@@ -96,9 +118,8 @@ YEARS = ["2024"]
 RUNS = None  # set e.g. ["Run2024C"] for a single run
 
 data_files, data_summary = load_scouting_data(years=YEARS, runs=RUNS)
-data_df = ROOT.RDataFrame("Events", data_files).Range(FILE_SIZE)
+data_df = ROOT.RDataFrame("Events", data_files)
 print(f"\nLoaded {len(data_files)} data files into RDataFrame")
-
 
 gen_decay_expr = (
     "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)"
@@ -121,17 +142,82 @@ for name in sig_samples:
         .Define("gen_eta_Htautau",  "genHtautau_p4.Eta()")
     )
 
-def define_ak4_pt(df):
-    return (df
+def define_kinematics(df):
+    """Define derived kinematic columns for jets.
+
+    Intermediate columns are avoided to keep the branch-proxy chain shallow
+    and prevent stack overflows with large TChains.
+    """
+    df = (df
         .Define("ak4_pt0", "ScoutingPFJetRecluster_pt[0]")
         .Define("ak4_pt1", "ScoutingPFJetRecluster_pt[1]")
         .Define("ak4_pt2", "ScoutingPFJetRecluster_pt[2]")
         .Define("ak4_pt3", "ScoutingPFJetRecluster_pt[3]")
+        .Define("HT",  "Sum(ScoutingPFJetRecluster_pt)")
+        .Define("nJets", "nScoutingPFJetRecluster")
+        .Define("nLeptons", "nScoutingMuonVtx + nScoutingElectron")
     )
+    df = (df.Define("mjj_01",
+                "(float)(ROOT::Math::PtEtaPhiMVector("
+                "ScoutingPFJetRecluster_pt[0],ScoutingPFJetRecluster_eta[0],"
+                "ScoutingPFJetRecluster_phi[0],ScoutingPFJetRecluster_mass[0])"
+                " + ROOT::Math::PtEtaPhiMVector("
+                "ScoutingPFJetRecluster_pt[1],ScoutingPFJetRecluster_eta[1],"
+                "ScoutingPFJetRecluster_phi[1],ScoutingPFJetRecluster_mass[1])).M()")
+        .Define("dR_01",
+                "ROOT::VecOps::DeltaR("
+                "ScoutingPFJetRecluster_eta[0],ScoutingPFJetRecluster_eta[1],"
+                "ScoutingPFJetRecluster_phi[0],ScoutingPFJetRecluster_phi[1])")
+        .Define("MHT",
+                "(float)sqrt("
+                "pow(Sum(ScoutingPFJetRecluster_pt*cos(ScoutingPFJetRecluster_phi)),2) + "
+                "pow(Sum(ScoutingPFJetRecluster_pt*sin(ScoutingPFJetRecluster_phi)),2))")
+        .Define("m4j",
+                "(float)(ROOT::Math::PtEtaPhiMVector("
+                "ScoutingPFJetRecluster_pt[0],ScoutingPFJetRecluster_eta[0],"
+                "ScoutingPFJetRecluster_phi[0],ScoutingPFJetRecluster_mass[0])"
+                " + ROOT::Math::PtEtaPhiMVector("
+                "ScoutingPFJetRecluster_pt[1],ScoutingPFJetRecluster_eta[1],"
+                "ScoutingPFJetRecluster_phi[1],ScoutingPFJetRecluster_mass[1])"
+                " + ROOT::Math::PtEtaPhiMVector("
+                "ScoutingPFJetRecluster_pt[2],ScoutingPFJetRecluster_eta[2],"
+                "ScoutingPFJetRecluster_phi[2],ScoutingPFJetRecluster_mass[2])"
+                " + ROOT::Math::PtEtaPhiMVector("
+                "ScoutingPFJetRecluster_pt[3],ScoutingPFJetRecluster_eta[3],"
+                "ScoutingPFJetRecluster_phi[3],ScoutingPFJetRecluster_mass[3])).M()")
+    )
+    # b-jet selection: ParticleNet BvsAll discriminator = (prob_b + prob_bb) / sum(all probs)
+    # Sort jets by BvsAll in descending order; [0] = highest, [1] = second-highest
+    df = (df
+        .Define("pnet_BvsAll",
+                "(ScoutingPFJetRecluster_particleNet_prob_b + ScoutingPFJetRecluster_particleNet_prob_bb)"
+                " / (ScoutingPFJetRecluster_particleNet_prob_b + ScoutingPFJetRecluster_particleNet_prob_bb"
+                " + ScoutingPFJetRecluster_particleNet_prob_c + ScoutingPFJetRecluster_particleNet_prob_cc"
+                " + ScoutingPFJetRecluster_particleNet_prob_g + ScoutingPFJetRecluster_particleNet_prob_uds"
+                " + ScoutingPFJetRecluster_particleNet_prob_undef)")
+        .Define("bsort_idx",
+                "ROOT::VecOps::Reverse(ROOT::VecOps::Argsort(pnet_BvsAll))")
+        .Define("b0_idx", "(int)bsort_idx[0]")
+        .Define("b1_idx", "(int)bsort_idx[1]")
+        .Define("b0_pt",    "ScoutingPFJetRecluster_pt[b0_idx]")
+        .Define("b0_eta",   "ScoutingPFJetRecluster_eta[b0_idx]")
+        .Define("b0_phi",   "ScoutingPFJetRecluster_phi[b0_idx]")
+        .Define("b0_mass",  "ScoutingPFJetRecluster_mass[b0_idx]")
+        .Define("b0_score", "pnet_BvsAll[b0_idx]")
+        .Define("b1_pt",    "ScoutingPFJetRecluster_pt[b1_idx]")
+        .Define("b1_eta",   "ScoutingPFJetRecluster_eta[b1_idx]")
+        .Define("b1_phi",   "ScoutingPFJetRecluster_phi[b1_idx]")
+        .Define("b1_mass",  "ScoutingPFJetRecluster_mass[b1_idx]")
+        .Define("b1_score", "pnet_BvsAll[b1_idx]")
+        .Define("mbb",
+                "(float)(ROOT::Math::PtEtaPhiMVector(b0_pt,b0_eta,b0_phi,b0_mass)"
+                " + ROOT::Math::PtEtaPhiMVector(b1_pt,b1_eta,b1_phi,b1_mass)).M()")
+    )
+    return df
 
-data_df = define_ak4_pt(data_df)
+data_df = define_kinematics(data_df)
 for name in mc:
-    mc[name] = define_ak4_pt(mc[name])
+    mc[name] = define_kinematics(mc[name])
 
 
 base_cut = "ak4_pt0 > 20.0 && ak4_pt1 > 20.0 && ak4_pt2 > 20.0 && ak4_pt3 > 20.0"
@@ -139,7 +225,8 @@ base_cut = "ak4_pt0 > 20.0 && ak4_pt1 > 20.0 && ak4_pt2 > 20.0 && ak4_pt3 > 20.0
 data_acc = data_df.Filter(base_cut)
 mc_acc = {name: df.Filter(base_cut) for name, df in mc.items()}
 
-setup_style()
+setup_style(dark=(ARGS.theme == "dark"))
+THEME_TAG = "_D" if ARGS.theme == "dark" else "_L"
 
 PLOT_DIR = os.path.join(ANA_DIR, "plots")
 os.makedirs(PLOT_DIR, exist_ok=True)
@@ -198,7 +285,7 @@ for trig_name, trig in TRIG_LIST:
     print(f"y_hh:y_hm:y_he: {y_hh:.6g}:{y_hm:.6g}:{y_he:.6g}")
     print()
 
-    # Stacked plot  (MC only — no data overlay)
+    # Stacked plots for multiple variables
     mc_items = [
         {"dfs": [mc_sel[s] for s in dy_samples],
          "label": "DY",                        "color": "tab:orange"},
@@ -209,15 +296,43 @@ for trig_name, trig in TRIG_LIST:
         {"dfs": he, "label": r"$HH\to bb\tau_\mu\tau_h$",  "color": "tab:purple"},
     ]
 
-    fig, ax = plot_stacked_all_mc(
-        mc_items=mc_items,
-        var="ak4_pt0",
-        weight="w",
-        nbins=36, xmin=0, xmax=1800,
-        logy=True,
-    )
+    PLOT_VARS = [
+        # (branch,     xlabel,                    nbins, xmin, xmax)
+        ("ak4_pt0",   r"Leading jet $p_T$ [GeV]",        36,    0,  1800),
+        ("ak4_pt1",   r"Sub-leading jet $p_T$ [GeV]",    36,    0,  1000),
+        ("ak4_pt2",   r"3rd jet $p_T$ [GeV]",            36,    0,   600),
+        ("ak4_pt3",   r"4th jet $p_T$ [GeV]",            36,    0,   400),
+        ("nJets",     r"Number of AK4 jets",               6,    0,     6),
+        ("nLeptons",  r"Number of leptons ($\mu + e$)",   10,    0,    10),
+        ("HT",        r"$H_T$ [GeV]",                    40,    0,  3000),
+        ("mjj_01",    r"$m_{jj}$ (leading dijet) [GeV]", 40,    0,  2000),
+        ("m4j",       r"$m_{4j}$ (leading 4 jets) [GeV]", 25,  0,   500),
+        ("MHT",       r"$\slash{H}_T$ [GeV]",            30,    0,  1500),
+        ("dR_01",     r"$\Delta R(j_0, j_1)$",           30,    0,  6),
+        ("b0_pt",     r"$b_0$ jet $p_T$ [GeV]",          36,    0,  1000),
+        ("b1_pt",     r"$b_1$ jet $p_T$ [GeV]",          36,    0,   600),
+        ("b0_score",  r"$b_0$ ParticleNet b-score",       25,    0,  1),
+        ("b1_score",  r"$b_1$ ParticleNet b-score",       25,    0,  1),
+        ("mbb",       r"$m_{bb}$ [GeV]",                  30,    0,   300),
+    ]
 
-    outpath = os.path.join(PLOT_DIR, f"stacked_ak4_pt0_{trig_name}.pdf")
-    fig.savefig(outpath)
-    print(f"Saved: {outpath}")
-    plt.close(fig)
+    for var_name, xlabel, nbins, vmin, vmax in PLOT_VARS:
+        outpath = os.path.join(PLOT_DIR, f"stacked_{var_name}_{trig_name}{THEME_TAG}.png")
+        if os.path.exists(outpath) and not ARGS.overwrite:
+            print(f"Skipping (exists): {outpath}  [use --overwrite to regenerate]")
+            continue
+
+        fig, ax = plot_stacked_all_mc(
+            mc_items=mc_items,
+            var=var_name,
+            weight="w",
+            nbins=nbins, xmin=vmin, xmax=vmax,
+            logy=True,
+            title=trig_name,
+        )
+        ax.set_xlabel(xlabel)
+
+        fig.savefig(outpath)
+        print(f"Saved: {outpath}")
+
+        plt.close(fig)

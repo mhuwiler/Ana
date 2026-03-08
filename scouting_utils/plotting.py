@@ -22,10 +22,20 @@ import ROOT
 # Style setup
 # ---------------------------------------------------------------------------
 
-def setup_style():
-    """Apply CMS style via mplhep and set standard rcParams."""
+_DARK_MODE = False
+
+
+def setup_style(dark=False):
+    """Apply CMS style via mplhep and set standard rcParams.
+
+    Parameters:
+        dark : bool – if True, use a dark background theme.
+    """
+    global _DARK_MODE
+    _DARK_MODE = dark
+
     plt.style.use(hep.style.CMS)
-    mpl.rcParams.update({
+    common = {
         "figure.dpi": 120,
         "savefig.dpi": 300,
         "savefig.bbox": "tight",
@@ -42,7 +52,23 @@ def setup_style():
         "ytick.major.size": 6,
         "xtick.minor.size": 3,
         "ytick.minor.size": 3,
-    })
+    }
+    mpl.rcParams.update(common)
+
+    if dark:
+        mpl.rcParams.update({
+            "figure.facecolor": "#1e1e1e",
+            "axes.facecolor": "#2b2b2b",
+            "savefig.facecolor": "#1e1e1e",
+            "axes.edgecolor": "#cccccc",
+            "axes.labelcolor": "#cccccc",
+            "xtick.color": "#cccccc",
+            "ytick.color": "#cccccc",
+            "text.color": "#cccccc",
+            "legend.facecolor": "#2b2b2b",
+            "legend.edgecolor": "#555555",
+            "grid.color": "#444444",
+        })
 
 
 # ---------------------------------------------------------------------------
@@ -432,12 +458,15 @@ def _build_mc_components(h_mc_list, mc_items, sort_by_yield=True):
 def _draw_mc_stack(ax, centers, widths, mc_components):
     """Draw the stacked MC bars and return the total stack height per bin."""
     bottom = np.zeros_like(centers, dtype=float)
+    edge_col = "#cccccc" if _DARK_MODE else "black"
     for comp in mc_components:
         item = comp["item"]
+        total_yield = comp["yield"]
+        label = f"{item['label']} ({total_yield:.2g})"
         ax.bar(
             centers, comp["vals"], width=widths, bottom=bottom, align="center",
-            label=item["label"], color=item["color"], alpha=1.0,
-            edgecolor="black", linewidth=0.2,
+            label=label, color=item["color"], alpha=1.0,
+            edgecolor=edge_col, linewidth=0.2,
         )
         bottom += comp["vals"]
     return bottom
@@ -452,9 +481,10 @@ def _draw_mc_stat_unc(ax, edges, stack_total, mc_components):
 
     band_lo = np.r_[stack_total - mc_err_total, (stack_total - mc_err_total)[-1]]
     band_hi = np.r_[stack_total + mc_err_total, (stack_total + mc_err_total)[-1]]
+    hatch_col = "#aaaaaa" if _DARK_MODE else "gray"
     ax.fill_between(
         edges, band_lo, band_hi,
-        step="post", facecolor="none", edgecolor="gray",
+        step="post", facecolor="none", edgecolor=hatch_col,
         hatch="////", linewidth=0, label="MC stat. unc.", zorder=5,
     )
     return mc_err_total
@@ -462,9 +492,12 @@ def _draw_mc_stat_unc(ax, edges, stack_total, mc_components):
 
 def _draw_data(ax, centers, data_vals, data_errs, label="Data JetMET"):
     """Draw data points with Poisson error bars."""
+    total_yield = float(np.sum(data_vals))
+    label_with_yield = f"{label} ({total_yield:.2g})"
+    data_col = "white" if _DARK_MODE else "black"
     ax.errorbar(
-        centers, data_vals, yerr=data_errs, fmt="o", color="black",
-        label=label, ms=4, capsize=2, linewidth=1, zorder=10,
+        centers, data_vals, yerr=data_errs, fmt="o", color=data_col,
+        label=label_with_yield, ms=4, capsize=2, linewidth=1, zorder=10,
     )
 
 
@@ -474,6 +507,7 @@ def plot_stacked_all_mc(
     nbins=20, xmin=0, xmax=1800,
     logy=True,
     sort_mc_by_yield=True,
+    title=None,
 ):
     """
     Stacked MC histogram with optional data overlay and MC stat. uncertainty band.
@@ -520,6 +554,8 @@ def plot_stacked_all_mc(
     # 4. Cosmetics
     ax.set_xlabel(var)
     ax.set_ylabel("Events")
+    if title is not None:
+        ax.set_title(title)
     ax.grid(True, axis="y", alpha=0.25)
     ax.legend(ncol=2)
 

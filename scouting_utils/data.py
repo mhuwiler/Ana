@@ -42,33 +42,61 @@ TT = [
     "TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8",
 ]
 
-SIG = [
-    "GluGluHHto2B2Tau_Par-c2-0p00-kl-0p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8",
+# Some samples have ext1 dataset extensions that have been submitted and can be
+# loaded similarly (same physics, additional statistics). On disk both the base
+# tag (v2) and ext1-v2 directories exist for: kl-0p00, kl-1p00, kl-2p45,
+# kl-5p00. The file discovery picks the most recent tag automatically.
+
+SM_SIG = [
+    # SM coupling point: c2=0, kl=1, kt=1
+    "GluGluHHto2B2Tau_Par-c2-0p00-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8",
 ]
 
-GROUPS = {"DY": DY, "TT": TT, "HHbbtt": SIG}
+# BSM_SIG = [
+#     # Varied kl (c2=0, kt=1)
+#     "GluGluHHto2B2Tau_Par-c2-0p00-kl-0p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8",   # kl=0
+#     "GluGluHHto2B2Tau_Par-c2-0p00-kl-2p45-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8",   # kl=2.45
+#     "GluGluHHto2B2Tau_Par-c2-0p00-kl-5p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8",   # kl=5
+#     # Varied c2 (kt=1)
+#     "GluGluHHto2B2Tau_Par-c2-0p10-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8",   # c2=0.1
+#     "GluGluHHto2B2Tau_Par-c2-0p35-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8",   # c2=0.35
+#     "GluGluHHto2B2Tau_Par-c2-1p00-kl-0p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8",   # c2=1, kl=0
+#     "GluGluHHto2B2Tau_Par-c2-3p00-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8",   # c2=3
+#     "GluGluHHto2B2Tau_Par-c2-m2p00-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8",  # c2=-2
+#     # Extreme BSM
+#     "GluGluHHto2B2Tau_Par-c2-2p24-kl-m20p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8", # c2=2.24, kl=-20
+# ] 
 
-_TT_INCLUSIVE_PB = 762.1           
+GROUPS = {"DY": DY, "TT": TT, "HHbbtt": SM_SIG}
+
+_TT_INCLUSIVE_PB = 923.6 # https://twiki.cern.ch/twiki/bin/view/LHCPhysics/TtbarNNLO      
 _BR_W_LNU  = 0.3258              
 _BR_W_QQ   = 0.6741
 
-_SIGMA_GGHH_KL0_FB = 75.76        
-_BR_HH_BBTAUTAU    = 2 * 0.5824 * 0.06272   
+_BR_HH_BBTAUTAU    = 2 * 0.5824 * 0.06272
+
+# gg->HH cross sections at 13.6 TeV in fb (NNLO FTapprox, LHCHWG)
+_SIGMA_GGHH_FB = {
+    # "kl-0p00":  75.76,   # kl=0
+    "kl-1p00":  34.30,   # kl=1 (SM)
+}
 
 XSEC = {
     # -- TT  (inclusive × BR) ------------------------------------------------
-    "TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8":  _TT_INCLUSIVE_PB * _BR_W_LNU**2,           # 80.9 pb
-    "TTto4Q_TuneCP5_13p6TeV_powheg-pythia8":     _TT_INCLUSIVE_PB * _BR_W_QQ**2,            # 346.3 pb
-    "TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8":  _TT_INCLUSIVE_PB * 2*_BR_W_LNU*_BR_W_QQ,  # 334.9 pb
+    "TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8":  _TT_INCLUSIVE_PB * _BR_W_LNU**2,
+    "TTto4Q_TuneCP5_13p6TeV_powheg-pythia8":     _TT_INCLUSIVE_PB * _BR_W_QQ**2,
+    "TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8":  _TT_INCLUSIVE_PB * 2*_BR_W_LNU*_BR_W_QQ,
     # -- DY NLO  (amcatnloFXFX, binned in pT_ll) ----------------------------
     "DYto2L-2Jets_Bin-2J-MLL-50-PTLL-40to100_TuneCP5_13p6TeV_amcatnloFXFX-pythia8": 170.5,
     "DYto2L-2Jets_Bin-MLL-50-PTLL-100_TuneCP5_13p6TeV_amcatnloFXFX-pythia8":        107.9,
     "DYto2L-2Jets_Bin-MLL-50-PTLL-200_TuneCP5_13p6TeV_amcatnloFXFX-pythia8":         11.13,
     "DYto2L-2Jets_Bin-MLL-50-PTLL-400_TuneCP5_13p6TeV_amcatnloFXFX-pythia8":          0.5914,
     "DYto2L-2Jets_Bin-MLL-50-PTLL-600_TuneCP5_13p6TeV_amcatnloFXFX-pythia8":          0.08008,
-    # -- Signal  (LHCHWG NNLO FTapprox × BR) ---------------------------------
-    "GluGluHHto2B2Tau_Par-c2-0p00-kl-0p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8":
-        _SIGMA_GGHH_KL0_FB / 1000.0 * _BR_HH_BBTAUTAU,   # 0.005533 pb  (5.53 fb)
+    # -- Signal  (LHCHWG NNLO FTapprox × BR(HH->bbtautau)) ------------------
+    # "GluGluHHto2B2Tau_Par-c2-0p00-kl-0p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8":
+    #     _SIGMA_GGHH_FB["kl-0p00"] / 1000.0 * _BR_HH_BBTAUTAU,
+    "GluGluHHto2B2Tau_Par-c2-0p00-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8":
+        _SIGMA_GGHH_FB["kl-1p00"] / 1000.0 * _BR_HH_BBTAUTAU,
 }
 
 # XCache / DAS settings
@@ -115,9 +143,16 @@ def ls_nanoaod_files_from_fs(
         if len(dataset_tags) == 1:
             dataset_tag = dataset_tags[0]
         else:
-            raise ValueError(
-                f"Multiple dataset_tag dirs under:\n  {sample_dir}\n"
-                f"Pass dataset_tag=... one of:\n  - " + "\n  - ".join(dataset_tags)
+            # Pick the most recently modified dataset_tag directory
+            dataset_tag = max(
+                dataset_tags,
+                key=lambda d: os.path.getmtime(os.path.join(sample_dir, d)),
+            )
+            import warnings
+            warnings.warn(
+                f"Multiple dataset_tag dirs under {sample_dir}, "
+                f"auto-selected newest: {dataset_tag}",
+                stacklevel=2,
             )
     else:
         if dataset_tag not in dataset_tags:
