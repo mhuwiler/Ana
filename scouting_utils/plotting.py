@@ -556,7 +556,7 @@ def plot_stacked_all_mc(
     ax.set_ylabel("Events")
     if title is not None:
         ax.set_title(title)
-    ax.grid(True, axis="y", alpha=0.25)
+    ax.grid(True, axis="both", alpha=0.25)
     ax.legend(ncol=2)
 
     if logy:
@@ -565,5 +565,60 @@ def plot_stacked_all_mc(
         if data_vals is not None:
             ymax = max(ymax, float(np.max(data_vals)))
         ax.set_ylim(0.5, max(10.0, 5.0 * ymax))
+
+    return fig, ax
+
+
+# ---------------------------------------------------------------------------
+# Shape overlay (normalised to unity)
+# ---------------------------------------------------------------------------
+
+def plot_shape_overlay(
+    data_df=None, mc_items=None, *,
+    var="ak4_pt0", weight="w",
+    nbins=20, xmin=0, xmax=1800,
+    logy=False,
+    title=None,
+):
+    """
+    Overlay normalised-to-unity shapes for each MC group (and optionally data).
+
+    Same interface as plot_stacked_all_mc but draws step histograms
+    instead of a stack, each normalised so that its integral equals 1.
+    """
+    h_data_ptr, h_mc_list = _book_histograms(
+        data_df, mc_items, var, weight, nbins, xmin, xmax,
+    )
+
+    edges = th1_to_np(h_mc_list[0])[0]
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    for h, item in zip(h_mc_list, mc_items):
+        _, vals, _ = th1_to_np(h)
+        area = float(np.sum(vals * np.diff(edges)))
+        if area > 0:
+            vals = vals / area
+        ax.step(edges, np.r_[vals, vals[-1]], where="post",
+                linewidth=2, color=item["color"], label=item["label"])
+
+    if h_data_ptr is not None:
+        _, data_vals, _ = th1_to_np(h_data_ptr.GetValue())
+        area = float(np.sum(data_vals * np.diff(edges)))
+        if area > 0:
+            data_vals = data_vals / area
+        data_col = "white" if _DARK_MODE else "black"
+        ax.step(edges, np.r_[data_vals, data_vals[-1]], where="post",
+                linewidth=2, color=data_col, linestyle="--", label="Data")
+
+    ax.set_xlabel(var)
+    ax.set_ylabel("Normalised to unity")
+    if title is not None:
+        ax.set_title(title)
+    ax.grid(True, axis="both", alpha=0.25)
+    ax.legend(ncol=2)
+
+    if logy:
+        ax.set_yscale("log")
 
     return fig, ax

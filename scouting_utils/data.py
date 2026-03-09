@@ -19,7 +19,7 @@ import ROOT
 # Constants
 # ---------------------------------------------------------------------------
 
-FILE_SIZE = 100_000
+MAX_EVENTS = 100_000  # max events per sample (0 = all)
 
 BASE = os.path.join(
     "/eos/purdue/store/user/arghyara",

@@ -14,7 +14,7 @@ from .data import (
     # BSM_SIG,
     GROUPS,
     XSEC,
-    FILE_SIZE,
+    MAX_EVENTS,
 )
 
 from .triggers import (
