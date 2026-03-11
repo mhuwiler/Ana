@@ -76,7 +76,11 @@ def setup_style(dark=False):
 # ---------------------------------------------------------------------------
 
 def th1_to_np(h):
-    """Convert a ROOT TH1 to (edges, values, errors) numpy arrays."""
+    """Convert a ROOT TH1 to (edges, values, errors) numpy arrays.
+
+    Underflow is folded into the first visible bin, overflow into the last.
+    Errors are added in quadrature.
+    """
     nb = h.GetNbinsX()
     edges = np.array(
         [h.GetXaxis().GetBinLowEdge(1 + i) for i in range(nb)]
@@ -85,6 +89,15 @@ def th1_to_np(h):
     )
     vals = np.array([h.GetBinContent(1 + i) for i in range(nb)], dtype=float)
     errs = np.array([h.GetBinError(1 + i) for i in range(nb)], dtype=float)
+
+    # Fold underflow (bin 0) into first visible bin
+    vals[0]  += h.GetBinContent(0)
+    errs[0]   = np.sqrt(errs[0]**2 + h.GetBinError(0)**2)
+
+    # Fold overflow (bin nb+1) into last visible bin
+    vals[-1] += h.GetBinContent(nb + 1)
+    errs[-1]  = np.sqrt(errs[-1]**2 + h.GetBinError(nb + 1)**2)
+
     return edges, vals, errs
 
 
@@ -612,6 +625,100 @@ def plot_shape_overlay(
                 linewidth=2, color=data_col, linestyle="--", label="Data")
 
     ax.set_xlabel(var)
+    ax.set_ylabel("Normalised to unity")
+    if title is not None:
+        ax.set_title(title)
+    ax.grid(True, axis="both", alpha=0.25)
+    ax.legend(ncol=2)
+
+    if logy:
+        ax.set_yscale("log")
+
+    return fig, ax
+
+
+# ---------------------------------------------------------------------------
+# Pre-materialized histogram versions  (no RunGraphs — caller provides TH1s)
+# ---------------------------------------------------------------------------
+
+def plot_stacked_from_hists(
+    h_mc_list, mc_items, *,
+    h_data=None,
+    logy=True,
+    sort_mc_by_yield=True,
+    title=None,
+):
+    """Stacked MC plot from pre-materialized TH1 objects (one per mc_item group).
+
+    Same visual output as plot_stacked_all_mc but skips histogram booking
+    and RunGraphs — the caller is responsible for providing ready TH1s.
+    """
+    if h_data is not None:
+        edges, data_vals, data_errs = th1_to_np(h_data)
+    else:
+        edges, _, _ = th1_to_np(h_mc_list[0])
+        data_vals = None
+        data_errs = None
+
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    widths = np.diff(edges)
+
+    mc_components = _build_mc_components(h_mc_list, mc_items, sort_by_yield=sort_mc_by_yield)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    stack_total = _draw_mc_stack(ax, centers, widths, mc_components)
+    _draw_mc_stat_unc(ax, edges, stack_total, mc_components)
+    if data_vals is not None:
+        _draw_data(ax, centers, data_vals, data_errs)
+
+    ax.set_ylabel("Events")
+    if title is not None:
+        ax.set_title(title)
+    ax.grid(True, axis="both", alpha=0.25)
+    ax.legend(ncol=2)
+
+    if logy:
+        ax.set_yscale("log")
+        ymax = float(np.max(stack_total)) if len(stack_total) else 1.0
+        if data_vals is not None:
+            ymax = max(ymax, float(np.max(data_vals)))
+        ax.set_ylim(0.5, max(10.0, 5.0 * ymax))
+
+    return fig, ax
+
+
+def plot_shape_from_hists(
+    h_mc_list, mc_items, *,
+    h_data=None,
+    logy=False,
+    title=None,
+):
+    """Shape overlay from pre-materialized TH1 objects (one per mc_item group).
+
+    Same visual output as plot_shape_overlay but skips histogram booking
+    and RunGraphs — the caller is responsible for providing ready TH1s.
+    """
+    edges = th1_to_np(h_mc_list[0])[0]
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    for h, item in zip(h_mc_list, mc_items):
+        _, vals, _ = th1_to_np(h)
+        area = float(np.sum(vals * np.diff(edges)))
+        if area > 0:
+            vals = vals / area
+        ax.step(edges, np.r_[vals, vals[-1]], where="post",
+                linewidth=2, color=item["color"], label=item["label"])
+
+    if h_data is not None:
+        _, data_vals, _ = th1_to_np(h_data)
+        area = float(np.sum(data_vals * np.diff(edges)))
+        if area > 0:
+            data_vals = data_vals / area
+        data_col = "white" if _DARK_MODE else "black"
+        ax.step(edges, np.r_[data_vals, data_vals[-1]], where="post",
+                linewidth=2, color=data_col, linestyle="--", label="Data")
+
     ax.set_ylabel("Normalised to unity")
     if title is not None:
         ax.set_title(title)

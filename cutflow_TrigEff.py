@@ -20,6 +20,7 @@ import os
 import sys
 import argparse
 import math
+import time
 import resource
 
 import numpy as np
@@ -30,9 +31,11 @@ parser.add_argument("--overwrite", action="store_true",
 parser.add_argument("--theme", choices=["light", "dark"], default="light",
                     help="Plot colour theme (default: light)")
 parser.add_argument("--max-files", type=int, default=0,
-                    help="Max files per sample (0 = use MAX_EVENTS limit)")
+                    help="Max files per MC sample (0 = use MAX_EVENTS limit)")
+parser.add_argument("--max-data-files", type=int, default=10,
+                    help="Max data files per run (0 = all files, default: 10)")
 parser.add_argument("--all-events", action="store_true",
-                    help="Process all events (ignore MAX_EVENTS limit)")
+                    help="Process all events (ignore MAX_EVENTS and max-data-files limits)")
 parser.add_argument("--plot-type", choices=["stacked", "shape", "both"],
                     default="both",
                     help="Which plot types to produce (default: both)")
@@ -57,8 +60,8 @@ from scouting_utils.triggers import (
 )
 from scouting_utils.plotting import (
     setup_style,
-    plot_stacked_all_mc,
-    plot_shape_overlay,
+    plot_stacked_from_hists,
+    plot_shape_from_hists,
     th1_to_np,
 )
 
@@ -86,7 +89,7 @@ print("CWD =", os.getcwd())
 print("sys.path[0] =", sys.path[0])
 
 
-LUMI = 1.0  # fb^-1
+LUMI = 103.964940861  # fb^-1  ## See brilcalc_DST_PFScouting_JetHT.txt (brilcalc recorded lumi, DST_PFScouting_JetHT, 2024 C-I Golden JSON) 
 BTAG_WP = 0.1  # loose b-tag working point for cutflow
 
 
@@ -153,15 +156,22 @@ sig_samples = list(group_files_by_sample["HHbbtt"].keys())
 # ──────────────────────────────────────────────────────────────────────────────
 
 YEARS = ["2024"]
-RUNS = None  # set e.g. ["Run2024C"] for a single run
+# RUNS = None  # set e.g. ["Run2024C"] for a single run
+RUNS = ["Run2024C"]
+# RUNS = ["Run2024C", "Run2024D", "Run2024E", "Run2024F", "Run2024G", "Run2024H", "Run2024I"]  # J excluded (1 file, no lumi)
 
 data_files, data_summary = load_scouting_data(years=YEARS, runs=RUNS)
-if ARGS.max_files > 0:
-    data_files = data_files[:ARGS.max_files]
-elif not ARGS.all_events and MAX_EVENTS > 0:
-    n_files = max(1, MAX_EVENTS // 10_000)
-    data_files = data_files[:n_files]
+# Apply data file limit (per run) unless --all-events
+if not ARGS.all_events and ARGS.max_data_files > 0:
+    n_before = len(data_files)
+    data_files = data_files[:ARGS.max_data_files]
+    print(f"  Limited data to {len(data_files)}/{n_before} files "
+          f"(--max-data-files {ARGS.max_data_files}, use --all-events for full dataset)")
+# Suppress XRootD error messages from unavailable files (non-fatal)
+_prev_err_level = ROOT.gErrorIgnoreLevel
+ROOT.gErrorIgnoreLevel = ROOT.kFatal
 data_df = ROOT.RDataFrame("Events", data_files)
+ROOT.gErrorIgnoreLevel = _prev_err_level
 print(f"\nLoaded {len(data_files)} data files into RDataFrame")
 
 
@@ -202,7 +212,7 @@ def define_kinematics(df):
     and prevent stack overflows with large TChains.
     """
     df = (df
-        .Define("ak4_pt0", "ScoutingPFJetRecluster_pt[0]")
+        .Define("ak4_pt0", "ScoutingPFJetRecluster_pt[0]") # Check this (Could be a bug in the processing)
         .Define("ak4_pt1", "ScoutingPFJetRecluster_pt[1]")
         .Define("ak4_pt2", "ScoutingPFJetRecluster_pt[2]")
         .Define("ak4_pt3", "ScoutingPFJetRecluster_pt[3]")
@@ -239,12 +249,15 @@ def define_kinematics(df):
                 "ScoutingPFJetRecluster_pt[3],ScoutingPFJetRecluster_eta[3],"
                 "ScoutingPFJetRecluster_phi[3],ScoutingPFJetRecluster_mass[3])).M()")
     )
-    # b-jet selection: ParticleNet BvsAll discriminator = (prob_b + prob_bb) / sum(all probs)
+    # b-jet selection: ParticleNet discriminators (prob_bb is for AK8 fat jets, not AK4)
+    # pnet_b_raw  = raw prob_b score per jet
+    # pnet_BvsAll = prob_b / (prob_b + prob_c + prob_cc + prob_g + prob_uds + prob_undef)
     # Sort jets by BvsAll in descending order; [0] = highest, [1] = second-highest
     df = (df
+        .Define("pnet_b_raw", "ScoutingPFJetRecluster_particleNet_prob_b")
         .Define("pnet_BvsAll",
-                "(ScoutingPFJetRecluster_particleNet_prob_b + ScoutingPFJetRecluster_particleNet_prob_bb)"
-                " / (ScoutingPFJetRecluster_particleNet_prob_b + ScoutingPFJetRecluster_particleNet_prob_bb"
+                "ScoutingPFJetRecluster_particleNet_prob_b"
+                " / (ScoutingPFJetRecluster_particleNet_prob_b"
                 " + ScoutingPFJetRecluster_particleNet_prob_c + ScoutingPFJetRecluster_particleNet_prob_cc"
                 " + ScoutingPFJetRecluster_particleNet_prob_g + ScoutingPFJetRecluster_particleNet_prob_uds"
                 " + ScoutingPFJetRecluster_particleNet_prob_undef)")
@@ -262,6 +275,8 @@ def define_kinematics(df):
         .Define("b1_phi",   "ScoutingPFJetRecluster_phi[b1_idx]")
         .Define("b1_mass",  "ScoutingPFJetRecluster_mass[b1_idx]")
         .Define("b1_score", "pnet_BvsAll[b1_idx]")
+        .Define("b0_raw",   "pnet_b_raw[b0_idx]")
+        .Define("b1_raw",   "pnet_b_raw[b1_idx]")
         .Define("mbb",
                 "(float)(ROOT::Math::PtEtaPhiMVector(b0_pt,b0_eta,b0_phi,b0_mass)"
                 " + ROOT::Math::PtEtaPhiMVector(b1_pt,b1_eta,b1_phi,b1_mass)).M()")
@@ -322,10 +337,10 @@ CUTFLOW_STEPS = [
 PLOT_VARS = [
     # (branch,     xlabel,                    nbins, xmin, xmax)
     # -- Jet pT --
-    ("ak4_pt0",   r"Leading jet $p_T$ [GeV]",        36,    0,  1800),
-    ("ak4_pt1",   r"Sub-leading jet $p_T$ [GeV]",    36,    0,  1000),
-    ("ak4_pt2",   r"3rd jet $p_T$ [GeV]",            36,    0,   600),
-    ("ak4_pt3",   r"4th jet $p_T$ [GeV]",            36,    0,   400),
+    ("ak4_pt0",   r"Leading jet $p_T$ [GeV]",        50,    0,  250),
+    ("ak4_pt1",   r"Sub-leading jet $p_T$ [GeV]",    50,    0,  250),
+    ("ak4_pt2",   r"3rd jet $p_T$ [GeV]",            50,    0,   250),
+    ("ak4_pt3",   r"4th jet $p_T$ [GeV]",            50,    0,   250),
     # -- Jet eta --
     ("ak4_eta0",  r"Leading jet $\eta$",              30,   -5,     5),
     ("ak4_eta1",  r"Sub-leading jet $\eta$",          30,   -5,     5),
@@ -352,8 +367,10 @@ PLOT_VARS = [
     # -- b-tagged jets --
     ("b0_pt",     r"$b_0$ jet $p_T$ [GeV]",          36,    0,  1000),
     ("b1_pt",     r"$b_1$ jet $p_T$ [GeV]",          36,    0,   600),
-    ("b0_score",  r"$b_0$ ParticleNet b-score",       25,    0,     1),
-    ("b1_score",  r"$b_1$ ParticleNet b-score",       25,    0,     1),
+    ("b0_score",  r"$b_0$ PNet $b/(b+c+cc+g+uds+undef)$", 25,  0,     1),
+    ("b1_score",  r"$b_1$ PNet $b/(b+c+cc+g+uds+undef)$", 25,  0,     1),
+    ("b0_raw",    r"$b_0$ PNet raw prob\_b",           25,    0,     1),
+    ("b1_raw",    r"$b_1$ PNet raw prob\_b",           25,    0,     1),
     ("mbb",       r"$m_{bb}$ [GeV]",                  30,    0,   300),
     ("dR_bb",     r"$\Delta R(b_0, b_1)$",           30,    0,     6),
     ("ptbb",      r"$p_T^{bb}$ [GeV]",               30,    0,  1000),
@@ -428,7 +445,13 @@ for trig_name, trig in TRIG_LIST:
                 + list(sum_w2.values())
                 + hh_w + hm_w + he_w
                 + sig_mHH_ptrs)
+    print(f"  Phase 1: launching RunGraphs with {len(all_ptrs)} actions "
+          f"({len(data_files)} data files) ...")
+    sys.stdout.flush()
+    t0 = time.time()
     ROOT.RDF.RunGraphs(all_ptrs)
+    dt = time.time() - t0
+    print(f"  Phase 1 RunGraphs done in {dt:.1f}s")
 
     # ── Extract cutflow results ──
     cutflow_rows = []
@@ -503,28 +526,78 @@ print(f"Cutflow table saved: {cutflow_path}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Phase 2 — Plotting  (no cutflow/yield computation here)
+# Phase 2 — Plotting  (single RunGraphs per trigger for ALL histograms)
 # ══════════════════════════════════════════════════════════════════════════════
 
 for trig_name in trig_selections:
     sel = trig_selections[trig_name]
+    data_sel = sel["data_sel"]
     mc_sel = sel["mc_sel"]
     hh, hm, he = sel["hh"], sel["hm"], sel["he"]
 
-    mc_items = [
-        {"dfs": [mc_sel[s] for s in dy_samples],
-         "label": "DY",   "color": "tab:orange"},
-        {"dfs": [mc_sel[s] for s in tt_samples],
-         "label": "TT",   "color": "tab:green"},
-        {"dfs": hh,
-         "label": r"$HH\to bb\tau_h\tau_h$",  "color": "tab:red"},
-        {"dfs": hm,
-         "label": r"$HH\to bb\tau_e\tau_h$",  "color": "tab:pink"},
-        {"dfs": he,
-         "label": r"$HH\to bb\tau_\mu\tau_h$", "color": "tab:purple"},
+    # MC group structure: list of (list_of_dfs, label, color)
+    mc_groups = [
+        ([mc_sel[s] for s in dy_samples], "DY",                              "tab:orange"),
+        ([mc_sel[s] for s in tt_samples], "TT",                              "tab:green"),
+        (hh,                              r"$HH\to bb\tau_h\tau_h$",         "tab:red"),
+        (hm,                              r"$HH\to bb\tau_\mu\tau_h$",       "tab:pink"),
+        (he,                              r"$HH\to bb\tau_e\tau_h$",         "tab:purple"),
     ]
+    mc_items = [{"label": lbl, "color": col} for _, lbl, col in mc_groups]
 
-    # -- Signal-only gen mHH shape --
+    # ── Book ALL histograms for all variables in one go ──
+    all_histo_ptrs = []
+    # histo_book[var_name][group_idx] = list of RResultPtrs (one per sub-df)
+    histo_book = {}
+    # data_histo_book[var_name] = RResultPtr for data (no weight)
+    data_histo_book = {}
+
+    for var_name, _xlabel, nbins, vmin, vmax in PLOT_VARS:
+        histo_book[var_name] = []
+        for gi, (dfs, _lbl, _col) in enumerate(mc_groups):
+            group_ptrs = []
+            for si, df in enumerate(dfs):
+                uid = f"{trig_name}_{var_name}_{gi}_{si}"
+                ptr = df.Histo1D(
+                    (f"h_{uid}", f";{var_name};Events", nbins, vmin, vmax),
+                    var_name, "w")
+                group_ptrs.append(ptr)
+                all_histo_ptrs.append(ptr)
+            histo_book[var_name].append(group_ptrs)
+        # Book data histogram (unweighted) — skip gen-only variables
+        if var_name != "gen_mHH":
+            uid_d = f"{trig_name}_{var_name}_data"
+            d_ptr = data_sel.Histo1D(
+                (f"h_{uid_d}", f";{var_name};Events", nbins, vmin, vmax),
+                var_name)
+            data_histo_book[var_name] = d_ptr
+            all_histo_ptrs.append(d_ptr)
+
+    print(f"\n[{trig_name}] Booked {len(all_histo_ptrs)} histograms for "
+          f"{len(PLOT_VARS)} variables x {len(mc_groups)} groups + data")
+    print(f"[{trig_name}] Running single event loop...")
+    t0 = time.time()
+    ROOT.RDF.RunGraphs(all_histo_ptrs)
+    dt = time.time() - t0
+    print(f"[{trig_name}] Event loop done in {dt:.1f}s. Drawing plots...")
+
+    # ── Materialize: combine sub-sample histograms per group ──
+    # h_by_var[var_name] = list of TH1 (one per mc_group, already summed)
+    h_by_var = {}
+    h_data_var = {}  # var_name -> TH1 (data)
+    for var_name in histo_book:
+        h_mc_list = []
+        for gi in range(len(mc_groups)):
+            ptrs = histo_book[var_name][gi]
+            combined = ptrs[0].GetValue().Clone()
+            for ptr in ptrs[1:]:
+                combined.Add(ptr.GetValue())
+            h_mc_list.append(combined)
+        h_by_var[var_name] = h_mc_list
+        if var_name in data_histo_book:
+            h_data_var[var_name] = data_histo_book[var_name].GetValue()
+
+    # ── Signal-only gen mHH shape (already computed in Phase 1) ──
     mHH_path = os.path.join(PLOT_DIR, f"{trig_name}_shape_gen_mHH.png")
     if os.path.exists(mHH_path) and not ARGS.overwrite:
         print(f"Skipping (exists): {mHH_path}")
@@ -547,17 +620,19 @@ for trig_name in trig_selections:
         print(f"Saved: {mHH_path}")
         plt.close(fig)
 
-    # -- Stacked & shape plots --
+    # ── Draw stacked & shape plots from pre-materialized histograms ──
     for var_name, xlabel, nbins, vmin, vmax in PLOT_VARS:
+        h_mc_list = h_by_var[var_name]
+        h_data = h_data_var.get(var_name, None)
+
         if do_stacked:
             outpath = os.path.join(PLOT_DIR, f"{trig_name}_stacked_{var_name}.png")
             if os.path.exists(outpath) and not ARGS.overwrite:
                 print(f"Skipping (exists): {outpath}")
             else:
-                fig, ax = plot_stacked_all_mc(
-                    mc_items=mc_items, var=var_name, weight="w",
-                    nbins=nbins, xmin=vmin, xmax=vmax, logy=True,
-                    title=trig_name)
+                fig, ax = plot_stacked_from_hists(
+                    h_mc_list, mc_items, h_data=h_data,
+                    logy=True, title=trig_name)
                 ax.set_xlabel(xlabel)
                 fig.savefig(outpath)
                 print(f"Saved: {outpath}")
@@ -568,10 +643,8 @@ for trig_name in trig_selections:
             if os.path.exists(outpath) and not ARGS.overwrite:
                 print(f"Skipping (exists): {outpath}")
             else:
-                fig, ax = plot_shape_overlay(
-                    mc_items=mc_items, var=var_name, weight="w",
-                    nbins=nbins, xmin=vmin, xmax=vmax,
-                    title=f"{trig_name} (shape)")
+                fig, ax = plot_shape_from_hists(
+                    h_mc_list, mc_items, title=f"{trig_name} (shape)")
                 ax.set_xlabel(xlabel)
                 fig.savefig(outpath)
                 print(f"Saved: {outpath}")
