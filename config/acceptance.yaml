@@ -1,0 +1,16 @@
+# config/acceptance.yaml — Kinematic fiducial / acceptance cuts
+#
+# Defines the basic event-level fiducial region that all events must satisfy
+# before any trigger or analysis-region requirement is applied. These are the
+# "preselection" / denominator cuts.
+#
+# Edit here — no C++ recompilation needed.
+
+jets:
+  n_min:    4       # minimum number of ScoutingPFJetRecluster jets in the event
+  pt_min:   20.0    # minimum pT [GeV] applied to each of the 4 leading jets
+                    # cut expression: ak4_pt0 > pt_min && ak4_pt1 > pt_min &&
+                    #                 ak4_pt2 > pt_min && ak4_pt3 > pt_min
+  eta_max:  2.4     # maximum |eta| for jets entering analysis (informational;
+                    # the current analysis does not apply a per-jet eta cut at
+                    # preselection — jets are simply sorted by pT)

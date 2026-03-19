@@ -1,0 +1,39 @@
+# config/objects.yaml — Physics object quality / ID cuts
+#
+# Defines what makes a "good" reconstructed physics object.
+# These cuts are used by elements/RecoObjects.C via Python interpolation
+# in cutflow_TrigEff.py. Edit here — no C++ recompilation needed.
+#
+# NOTE: Values are tuned for scouting data, which has limited tracking
+# information (fewer pixel layers, coarser vertex resolution) compared
+# to full offline reconstruction.
+
+muon:
+  pt_min:   20.0    # minimum pT [GeV]
+  eta_max:  2.4     # maximum |eta|
+  iso_max:  0.15    # maximum relative track isolation: ScoutingMuonVtx_trackIso / pT
+  dxy_max:  0.045   # maximum |dxy| [cm]  (ScoutingMuonVtx_trk_dxy)
+  dz_max:   0.2     # maximum |dz|  [cm]  (ScoutingMuonVtx_trk_dz)
+  chi2_max: 10.0    # maximum normalised track chi2 (ScoutingMuonVtx_normchi2)
+
+electron:
+  pt_min:   15.0    # minimum pT [GeV]
+  eta_max:  2.5     # maximum |eta|  (ECAL crack 1.4442 < |eta| < 1.566 excluded in C++)
+  iso_max:  0.2     # maximum relative track isolation: ScoutingElectron_trackIso / pT
+  d0_max:   0.045   # maximum |d0|  [cm]  (ScoutingElectron_bestTrack_d0)
+  dz_max:   0.2     # maximum |dz|  [cm]  (ScoutingElectron_bestTrack_dz)
+  hoe_max:  0.15    # maximum H/E         (ScoutingElectron_hOverE)
+  # Shower-shape cuts split by barrel (|eta|<1.4442) / endcap (|eta|>1.566)
+  sieta_barrel: 0.011   # sigmaIetaIeta barrel
+  sieta_endcap: 0.031   # sigmaIetaIeta endcap
+  deta_barrel:  0.007   # |dEtaIn| barrel
+  deta_endcap:  0.009   # |dEtaIn| endcap
+  dphi_barrel:  0.15    # |dPhiIn| barrel
+  dphi_endcap:  0.10    # |dPhiIn| endcap
+
+btag:
+  wp: 0.1           # BvsAll working point (very loose, scouting-tuned)
+                    # Loose because scouting ParticleNet has limited tracking info:
+                    # no pixel layers, coarser vertex resolution.
+                    # BvsAll = prob_b / (prob_b + prob_c + prob_cc + prob_g + prob_uds + prob_undef)
+                    # Note: prob_bb is intentionally excluded (AK8 variable, not meaningful for AK4)

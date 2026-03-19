@@ -1,134 +1,23 @@
-############################
-# OS / Editor
-############################
-.DS_Store
-Thumbs.db
-*~
-*.swp
-*.swo
-
-.vscode/
-!.vscode/settings.json
-!.vscode/extensions.json
-!.vscode/launch.json
-!.vscode/tasks.json
-
-.idea/
-*.iml
-
-############################
-# Python
-############################
-__pycache__/
-*.py[cod]
-*$py.class
-
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-.coverage.*
-.cache/
-
-dist/
-build/
-*.egg-info/
-.eggs/
-pip-wheel-metadata/
-
-############################
-# Jupyter
-############################
-.ipynb_checkpoints/
-*.nbconvert.ipynb
-
-############################
-# Conda / venv / envs
-############################
-.venv/
-venv/
-env/
-ENV/
-.conda/
-conda-env/
-miniconda*/
-anaconda*/
-.mamba/
-.micromamba/
-
-.condarc
-.conda_envs/
-conda-meta/
-
-############################
-# Pixi
-############################
+# Pixi environment (symlinked to /work/ on Purdue AF)
 .pixi/
-# keep pixi.lock tracked (do NOT ignore it)
+
+# Pixi lock file (optional: remove this line if you want reproducible locks in git)
 # pixi.lock
 
-############################
-# ROOT / PyROOT / ACLiC artifacts
-############################
-*_C.so
+# ROOT ACLiC build artifacts
 *_C.d
-*_C_ACLiC_dict.*
-*_C_ACLiC_dict_rdict.pcm
-*.pcm
-*.rootmap
-*.dylib
-*.so
-*.dll
-*.d
+*_C.so
+*_C_ACLiC_dict*
+*_h.d
+*_h.so
+*_h_ACLiC_dict*
 
-# ROOT outputs (comment out if you want to version .root)
-*.root
-
-.root_hist
-.rootrc
-.nfs*
-
-############################
-# C / C++ build systems
-############################
-*.o
-*.a
-*.obj
-*.exe
-*.out
-
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-compile_commands.json
-cmake-build-*/
-
-meson-private/
-builddir/
-.ninja_deps
-.ninja_log
-
-############################
-# Data / results / logs
-############################
-logs/
-log/
-*.log
-
-outputs/
-output/
-results/
+# Plot output
 plots/
-figures/
 
-############################
-# Temporary / scratch
-############################
-tmp/
-temp/
-scratch/
-work/
+# Python bytecode
+__pycache__/
+*.pyc
 
-.claude/
+# Histogram cache
+.hist_cache.root

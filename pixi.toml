@@ -1,1 +1,23 @@
-/work/users/das214/pixi/hh/pixi.toml
+[workspace]
+authors = ["Arghya Ranjan Das <arghyaranjandas@gmail.com>"]
+channels = ["conda-forge"]
+name = "hh-bbtautau-scouting"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.11,<3.13"
+root = "*"
+numpy = "*"
+matplotlib = "*"
+mplhep = "*"
+pyyaml = "*"
+xrootd = "*"
+pandas = "*"
+ipykernel = "*"
+
+[pypi-dependencies]
+brilws = "*"
+prettytable = "*"
