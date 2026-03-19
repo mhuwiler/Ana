@@ -25,6 +25,7 @@ __pycache__/
 # Histogram cache
 .hist_cache.root
 
-# Build artifacts and logs
+# Build artifacts, logs, and output
 build/
 logs/
+output/
