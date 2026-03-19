@@ -1,0 +1,154 @@
+# ============================================================================
+# Sample configuration for HH->bbtautau scouting analysis
+#
+# dataset_tag:    null -> auto-select newest directory on disk
+#                 "string" -> pin to that exact tag
+#
+# production_id:  null -> auto-select latest (alphabetically last) on disk
+#                 "string" -> pin to that exact CRAB production timestamp
+#
+#   The production_id is the CRAB job timestamp (YYMMDD_HHMMSS) that
+#   identifies when cmsRun was executed.  Each dataset_tag directory can
+#   contain multiple production_id subdirectories from successive CRAB
+#   submissions.  The code picks the alphabetically last one by default,
+#   which is usually the newest — but a new resubmission may be incomplete
+#   or broken.  Pin the production_id here to lock to a known-good set.
+#
+# Comment out entire sample entries with '#' to disable them.
+# Cross sections (xsec_pb) are in picobarns.
+#
+# Pinned to the versions used for the March 12 2026 presentation.
+# ============================================================================
+
+settings:
+  base_dir: /eos/purdue/store/user/arghyara/production/Scouting/NanoAODv15Scouting24/mcscouting_2024
+  max_events: 100000          # 0 = all events; overridden by --max-files / --all-events CLI flags
+  xcache_prefix: "root://xcache.cms.rcac.purdue.edu/"
+  dasgoclient: /cvmfs/cms.cern.ch/common/dasgoclient
+  scouting_data_json: /home/das214/HHtobbtautau/Run3_nano_submission/datasets/Scouting_DATA.json
+
+
+# ============================================================================
+# MC sample groups
+# ============================================================================
+groups:
+
+  # --------------------------------------------------------------------------
+  # Drell-Yan (NLO, pT_ll-binned)
+  #   Total DY cross sections from amcatnloFXFX
+  # --------------------------------------------------------------------------
+  DY:
+    DYto2L-2Jets_Bin-2J-MLL-50-PTLL-40to100_TuneCP5_13p6TeV_amcatnloFXFX-pythia8:
+      dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v3_DAZSLE_PFNano"
+      production_id: "260204_204410"    # 593 files
+      xsec_pb: 170.5
+
+    DYto2L-2Jets_Bin-MLL-50-PTLL-100_TuneCP5_13p6TeV_amcatnloFXFX-pythia8:
+      dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v3_DAZSLE_PFNano"
+      production_id: "260204_204419"    # 294 files (260314 resubmission has only 1 file)
+      xsec_pb: 107.9
+
+    DYto2L-2Jets_Bin-MLL-50-PTLL-200_TuneCP5_13p6TeV_amcatnloFXFX-pythia8:
+      dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
+      production_id: "260204_204427"    # 877 files (260314 resubmission has only 3 files)
+      xsec_pb: 11.13
+
+    DYto2L-2Jets_Bin-MLL-50-PTLL-400_TuneCP5_13p6TeV_amcatnloFXFX-pythia8:
+      dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
+      production_id: "260204_204435"    # 694 files (260314 resubmission has only 28 files)
+      xsec_pb: 0.5914
+
+    DYto2L-2Jets_Bin-MLL-50-PTLL-600_TuneCP5_13p6TeV_amcatnloFXFX-pythia8:
+      dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v3_DAZSLE_PFNano"
+      production_id: "260204_204443"    # 1830 files
+      xsec_pb: 0.08008
+
+  # --------------------------------------------------------------------------
+  # Top pair (NNLO inclusive = 923.6 pb, split by W decay BRs)
+  #   BR(W->lnu) = 0.3258,  BR(W->qq) = 0.6741
+  #   Ref: https://twiki.cern.ch/twiki/bin/view/LHCPhysics/TtbarNNLO
+  # --------------------------------------------------------------------------
+  TT:
+    TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8:
+      dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v3_DAZSLE_PFNano"
+      production_id: "260203_210002"    # 1361 files
+      xsec_pb: 98.04        # 923.6 * 0.3258^2
+
+    TTto4Q_TuneCP5_13p6TeV_powheg-pythia8:
+      dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
+      production_id: "260203_210011"    # 610 files (260314 resubmission has only 1 file)
+      xsec_pb: 419.7        # 923.6 * 0.6741^2
+
+    TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8:
+      dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
+      production_id: "260203_210018"    # 798 files
+      xsec_pb: 405.7        # 923.6 * 2 * 0.3258 * 0.6741
+
+  # --------------------------------------------------------------------------
+  # Signal: gg->HH->bbtautau (SM coupling point)
+  #   sigma_ggHH(13.6 TeV, kl=1) = 34.30 fb  (NNLO FTapprox, LHCHWG)
+  #   BR(HH->bbtautau) = 2 * 0.5824 * 0.06272 = 0.07304
+  # --------------------------------------------------------------------------
+  HHbbtt:
+    GluGluHHto2B2Tau_Par-c2-0p00-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
+      dataset_tag: "RunIII2024Summer24MiniAODv6-PowhegBugFix_150X_mcRun3_2024_realistic_v2_ext1-v2_DAZSLE_PFNano"
+      production_id: "260303_072840"    # 19 files (ext1, larger stats)
+      xsec_pb: 0.002506     # 34.30/1000 * 0.07304
+
+  # --------------------------------------------------------------------------
+  # BSM signal points (uncomment to enable)
+  #   Varied kl (c2=0, kt=1) and c2 benchmarks
+  # --------------------------------------------------------------------------
+  # BSM_SIG:
+  #   GluGluHHto2B2Tau_Par-c2-0p00-kl-0p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
+  #     dataset_tag: null
+  #     production_id: null
+  #     xsec_pb: 0.005535   # 75.76/1000 * 0.07304  (kl=0)
+  #
+  #   GluGluHHto2B2Tau_Par-c2-0p00-kl-2p45-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
+  #     dataset_tag: null
+  #     production_id: null
+  #     xsec_pb: 0.001805   # kl=2.45
+  #
+  #   GluGluHHto2B2Tau_Par-c2-0p00-kl-5p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
+  #     dataset_tag: null
+  #     production_id: null
+  #     xsec_pb: 0.008290   # kl=5
+  #
+  #   GluGluHHto2B2Tau_Par-c2-0p10-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
+  #     dataset_tag: null
+  #     production_id: null
+  #     xsec_pb: 0.002506   # c2=0.1 (placeholder — update with correct xsec)
+  #
+  #   GluGluHHto2B2Tau_Par-c2-0p35-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
+  #     dataset_tag: null
+  #     production_id: null
+  #     xsec_pb: 0.002506   # c2=0.35 (placeholder)
+  #
+  #   GluGluHHto2B2Tau_Par-c2-1p00-kl-0p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
+  #     dataset_tag: null
+  #     production_id: null
+  #     xsec_pb: 0.002506   # c2=1, kl=0 (placeholder)
+  #
+  #   GluGluHHto2B2Tau_Par-c2-3p00-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
+  #     dataset_tag: null
+  #     production_id: null
+  #     xsec_pb: 0.002506   # c2=3 (placeholder)
+  #
+  #   GluGluHHto2B2Tau_Par-c2-m2p00-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
+  #     dataset_tag: null
+  #     production_id: null
+  #     xsec_pb: 0.002506   # c2=-2 (placeholder)
+  #
+  #   GluGluHHto2B2Tau_Par-c2-2p24-kl-m20p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
+  #     dataset_tag: null
+  #     production_id: null
+  #     xsec_pb: 0.002506   # c2=2.24, kl=-20 (placeholder)
+
+
+# ============================================================================
+# Data configuration
+# ============================================================================
+data:
+  years: ["2024"]
+  runs: null                 # null = all runs; or list like ["Run2024C", "Run2024D"]

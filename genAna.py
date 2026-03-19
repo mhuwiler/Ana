@@ -38,13 +38,13 @@ STACK_SIZE = 64 * 1024 * 1024
 resource.setrlimit(resource.RLIMIT_STACK, (STACK_SIZE, resource.RLIM_INFINITY))
 
 import ROOT
-import anaConfig
+# anaConfig removed — FileFlow.h (old framework) no longer needed
 
-from scouting_utils.data import (
+from utils.data import (
     ls_nanoaod_files_groups,
     BASE, GROUPS, XSEC, MAX_EVENTS,
 )
-from scouting_utils.plotting import setup_style
+from utils.plotting import setup_style
 
 import matplotlib.pyplot as plt
 import mplhep as hep
@@ -60,6 +60,9 @@ os.chdir(ANA_DIR)
 sys.path.insert(0, ANA_DIR)
 
 ROOT.gInterpreter.AddIncludePath(ANA_DIR)
+BUILD_DIR = os.path.join(ANA_DIR, "build")
+os.makedirs(BUILD_DIR, exist_ok=True)
+ROOT.gSystem.SetBuildDir(BUILD_DIR)
 ROOT.gROOT.LoadMacro("Particle.h+")
 ROOT.gROOT.LoadMacro("HHbbtautauAnaElements.C+")
 

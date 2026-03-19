@@ -8,7 +8,6 @@
 #include "Math/Vector4D.h"
 #include <thread>
 #include "Particle.h"
-#include "FileFlow.h"
 
 
 constexpr double Pion_Mass = 0.13957; // The pion mass from the PDG (used as default mass hypothesis)
@@ -31,7 +30,7 @@ using R4Vec = ROOT::Math::PtEtaPhiM4D<T>;
 
 namespace Ana 
 {
-	extern std::unordered_map<std::string, int> autoblacklist; 
+	std::unordered_map<std::string, int> autoblacklist;
 
 	template <typename T>
 	T defaultValue();	
@@ -112,10 +111,60 @@ namespace Ana
 			int VBFgenJet2 = -999.; 
 	};
 
+
+	// ── Combinatorial dijet mass-window pairing ──────────────────────────────
+
+	struct DijetPair {
+		int i1 = -1;
+		int i2 = -1;
+		float mass = -1.f;
+	};
+
+	DijetPair findDijetInWindow(
+		const ROOT::VecOps::RVec<float>& pt,
+		const ROOT::VecOps::RVec<float>& eta,
+		const ROOT::VecOps::RVec<float>& phi,
+		const ROOT::VecOps::RVec<float>& m,
+		float mLo, float mHi, float target,
+		const std::vector<int>& exclude = {})
+	{
+		DijetPair best;
+		float bestDist = 1e9f;
+		int n = pt.size();
+
+		for (int i = 0; i < n; i++) {
+			bool skip_i = false;
+			for (int ex : exclude) { if (i == ex) { skip_i = true; break; } }
+			if (skip_i) continue;
+
+			for (int j = i + 1; j < n; j++) {
+				bool skip_j = false;
+				for (int ex : exclude) { if (j == ex) { skip_j = true; break; } }
+				if (skip_j) continue;
+
+				auto p4 = ROOT::Math::PtEtaPhiMVector(pt[i], eta[i], phi[i], m[i])
+				         + ROOT::Math::PtEtaPhiMVector(pt[j], eta[j], phi[j], m[j]);
+				float mjj = (float)p4.M();
+
+				if (mjj >= mLo && mjj <= mHi) {
+					float dist = std::abs(mjj - target);
+					if (dist < bestDist) {
+						bestDist = dist;
+						best.i1 = i;
+						best.i2 = j;
+						best.mass = mjj;
+					}
+				}
+			}
+		}
+		return best;
+	}
+
+
 	template<typename T>
 	int VecSize(ROOT::VecOps::RVec<T> vec)
 	{
-		return vec.size(); 
+		return vec.size();
 	}
 
 
