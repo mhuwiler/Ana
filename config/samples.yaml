@@ -104,37 +104,37 @@ groups:
     QCD-4Jets_Bin-HT-40to70_TuneCP5_13p6TeV_madgraphMLM-pythia8:
       dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
       production_id: "260317_065305"    # 10 files
-      xsec_pb: 25700000.0   # placeholder LO
+      xsec_pb: 311300000.0  # GenXSecAnalyzer: 3.113e+08 ± 1.042e+06
 
     QCD-4Jets_Bin-HT-100to200_TuneCP5_13p6TeV_madgraphMLM-pythia8:
       dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
       production_id: "260317_065214"    # 263 files
-      xsec_pb: 1607000.0    # placeholder LO
+      xsec_pb: 25130000.0   # GenXSecAnalyzer: 2.513e+07 ± 3.436e+05
 
     QCD-4Jets_Bin-HT-200to400_TuneCP5_13p6TeV_madgraphMLM-pythia8:
       dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
       production_id: "260317_065248"    # 430 files
-      xsec_pb: 73500.0      # placeholder LO
+      xsec_pb: 1975000.0    # GenXSecAnalyzer: 1.975e+06 ± 8.945e+03
 
     QCD-4Jets_Bin-HT-800to1000_TuneCP5_13p6TeV_madgraphMLM-pythia8:
       dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
       production_id: "260317_065331"    # 600 files
-      xsec_pb: 114.2        # placeholder LO
+      xsec_pb: 3027.0       # GenXSecAnalyzer: 3.027e+03 ± 1.426e+01
 
     QCD-4Jets_Bin-HT-1000to1200_TuneCP5_13p6TeV_madgraphMLM-pythia8:
       dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
       production_id: "260317_065206"    # 99 files
-      xsec_pb: 42.65        # placeholder LO
+      xsec_pb: 895.1        # GenXSecAnalyzer: 8.951e+02 ± 4.858e+00
 
     QCD-4Jets_Bin-HT-1500to2000_TuneCP5_13p6TeV_madgraphMLM-pythia8:
       dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
       production_id: "260317_065232"    # 5 files
-      xsec_pb: 3.437        # placeholder LO
+      xsec_pb: 127.1        # GenXSecAnalyzer: 1.271e+02 ± 8.289e-01
 
     QCD-4Jets_Bin-HT-2000_TuneCP5_13p6TeV_madgraphMLM-pythia8:
       dataset_tag: "RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2_DAZSLE_PFNano"
       production_id: "260317_065240"    # 107 files
-      xsec_pb: 0.5765       # placeholder LO
+      xsec_pb: 26.72        # GenXSecAnalyzer: 2.672e+01 ± 4.135e-01
 
   # --------------------------------------------------------------------------
   # BSM signal points (uncomment to enable)
