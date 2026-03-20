@@ -11,7 +11,7 @@ Usage:
     python cutflow_TrigEff.py --max-data-files 50          # load 50 data files (default: 10)
     python cutflow_TrigEff.py --no-data                    # skip data entirely (Phase 4+5)
     python cutflow_TrigEff.py --all-events                 # all MC + all data files
-    python cutflow_TrigEff.py --max-files 2                # quick test with 2 MC files per sample
+    python cutflow_TrigEff.py --max-mc-files 2                # quick test with 2 MC files per sample
     python cutflow_TrigEff.py --plot-type stacked          # only stacked plots
     python cutflow_TrigEff.py --plot-type shape            # only shape overlay plots
     python cutflow_TrigEff.py --skip-cutflow               # skip cutflow, only plots
@@ -51,7 +51,7 @@ parser.add_argument("--overwrite", action="store_true",
                     help="Overwrite existing plots instead of skipping them")
 parser.add_argument("--theme", choices=["light", "dark"], default="light",
                     help="Plot colour theme (default: light)")
-parser.add_argument("--max-files", type=int, default=0,
+parser.add_argument("--max-mc-files", type=int, default=0,
                     help="Max files per MC sample (0 = use MAX_EVENTS limit)")
 parser.add_argument("--max-data-files", type=int, default=10,
                     help="Max data files per run (0 = all files, default: 10)")
@@ -355,15 +355,15 @@ _, group_files_by_sample = ls_nanoaod_files_groups(
 
 
 def _limit_files(files, sample_name):
-    """Filter missing files and apply --max-files / MAX_EVENTS file cap."""
+    """Filter missing files and apply --max-mc-files / MAX_EVENTS file cap."""
     good_files = [f for f in files if os.path.isfile(f)]
     if len(good_files) < len(files):
         print(f"  WARNING: {len(files) - len(good_files)} missing file(s) "
               f"in {sample_name}, using {len(good_files)}/{len(files)}")
     if not good_files:
         raise FileNotFoundError(f"No valid files for {sample_name}")
-    if ARGS.max_files > 0:
-        good_files = good_files[:ARGS.max_files]
+    if ARGS.max_mc_files > 0:
+        good_files = good_files[:ARGS.max_mc_files]
     elif not ARGS.all_events and MAX_EVENTS > 0:
         n_files = max(1, MAX_EVENTS // 10_000)
         good_files = good_files[:n_files]
@@ -711,7 +711,7 @@ _cache_path = os.path.join(PLOT_DIR, ".hist_cache.root")
 _plot_var_names = [v[0] for v in PLOT_VARS]
 _trig_names = [tn for tn, _ in TRIG_LIST]
 _expected_meta = _cache_meta(
-    max_files=ARGS.max_files,
+    max_files=ARGS.max_mc_files,
     plot_vars_names=_plot_var_names,
 )
 
