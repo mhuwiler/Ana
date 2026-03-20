@@ -11,7 +11,13 @@
 - Added QCD multijet (mode 30) to DECAY_MODES LUT — now 12 MC groups total
   (5 DY + 3 TT + 3 Signal + 1 QCD). QCD skips decayMode filter (no gen matching)
 - Cutflow table now shows DY, TT, QCD, Signal columns with S/√B including QCD in B
+- Renamed `--max-files` → `--max-mc-files` for clarity (separate from `--max-data-files`)
+- Added AK8 fat jet variables (17 new): pT, eta, mass, soft-drop mass,
+  ScoutGlobalParT tagger scores (Xbb, Xτhτh, Xτμτh, Xτeτh, QCD)
+  for leading + subleading jets. AK8 pT > 150 GeV cut applied.
 - Created `des/cpp_engine.md` — full C++ engine reference doc
+- Created `notes.md` (activity log) and `status.md` (project summary)
+- XCache data loading tested — currently hanging (infrastructure issue)
 - Committed and pushed all changes to `scouting` branch
 
 ### 2026-03-19
