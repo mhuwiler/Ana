@@ -27,7 +27,7 @@
   `ROOT.gROOT.GetListOfFiles().Clear()` barrier before Phase 3 plotting
 - Verified pixi env works end-to-end (compilation + event loop + plotting)
 
-### 2026-03-18
+### 2026-03-18 – 2026-03-19
 
 - Restructured `Ana/` for scouting analysis
   - Created `elements/` folder with `common.h`, `GenMatching.C`, `RecoObjects.C`
@@ -40,6 +40,56 @@
 - Added trigger overlay plots (Phase 3.5) and per-channel signal overlays
 - Added `--plot-vars`, `--recache`, `--skip-cutflow` CLI flags
 - Implemented histogram cache (`.hist_cache.root`) with auto-invalidation
+- Added NoTrigger (preselection only) alongside DST_JetHT and PARKING_HH
+- Created `make_pdf.py` comparison tool (side-by-side triggers, `--compare` mode)
+- YAML configs: `config/objects.yaml`, `config/acceptance.yaml`, `config/regions.yaml`
+
+### 2026-03-11
+
+- Updated luminosity to brilcalc value (103.965 fb⁻¹)
+- Fixed b-tagger: BvsAll excludes `prob_bb` (AK8-only variable)
+- Added `--max-files` for data file limiting (replaces Range() which breaks ImplicitMT)
+- Created PDF maker tool
+
+### 2026-03-08 – 2026-03-09
+
+- Added kinematic plots (jet pT, eta, phi, HT, m4j, dijet masses)
+- Implemented b-jet selection with ParticleNet BvsAll discriminant
+- Added dark theme support
+- Enabled ROOT ImplicitMT (32 threads)
+
+### 2026-02-26 – 2026-02-27
+
+- Refactored codebase, added GenXSecAnalyzer scripts (`scripts/run_xsec.sh`)
+- Added Run2024 scouting data
+- Fixed yield plot errors
+
+### 2026-02-06 – 2026-02-13
+
+- Initial scouting analysis: trigger efficiency, cutflow
+- AK4 and AK8 jet implementations
+- Added acceptance conditions and `.gitignore`
+- Cleaned up `__pycache__` and `.ipynb_checkpoints`
+
+### 2026-01-19
+
+- Gen-level matching work (on `lite` branch, pre-scouting)
+  - bb and ττ component matching, dR requirements
+  - FatJet matching, tagger variables
+  - Electron reco function, ID thresholds
+
+### 2025 (lite branch — pre-scouting era)
+
+- ABCD method implementation, signal region cuts
+- C++ anaConfig for cut definitions
+- Fit distribution exports
+- Repository pruning (Nov 2025)
+
+### 2022 (original repo — BDT/ML era)
+
+- BDT training with variable importance
+- ROC curves, FOM computation
+- Input variable correlations
 
 ---
 
