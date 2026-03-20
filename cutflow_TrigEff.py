@@ -492,29 +492,32 @@ def define_kinematics(df):
         .Define("nJets", "nScoutingPFJetRecluster")
         .Define("nLeptons", "nScoutingMuonVtx + nScoutingElectron")
     )
-    # -- AK8 fat jet kinematics + ScoutGlobalParT tagger --
+    # -- AK8 fat jet kinematics + ScoutGlobalParT tagger (pT > 150 GeV) --
     _AK8 = "ScoutingFatPFJetRecluster"
     _SGP = f"{_AK8}_scoutGlobalParT"
+    _AK8_PT_MIN = 150.0
+    _has_ak8_0 = f"(n{_AK8}>=1 && {_AK8}_pt[0]>{_AK8_PT_MIN}f)"
+    _has_ak8_1 = f"(n{_AK8}>=2 && {_AK8}_pt[1]>{_AK8_PT_MIN}f)"
     df = (df
-        .Define("nFatJets",  f"n{_AK8}")
-        .Define("ak8_pt0",   f"n{_AK8}>=1 ? {_AK8}_pt[0] : -1.f")
-        .Define("ak8_eta0",  f"n{_AK8}>=1 ? {_AK8}_eta[0] : -99.f")
-        .Define("ak8_mass0", f"n{_AK8}>=1 ? {_AK8}_mass[0] : -1.f")
-        .Define("ak8_msd0",  f"n{_AK8}>=1 ? {_AK8}_msoftdrop[0] : -1.f")
-        .Define("ak8_Xbb0",  f"n{_AK8}>=1 ? {_SGP}_prob_Xbb[0] : -1.f")
-        .Define("ak8_Xtt0",  f"n{_AK8}>=1 ? {_SGP}_prob_Xtauhtauh[0] : -1.f")
-        .Define("ak8_Xtm0",  f"n{_AK8}>=1 ? {_SGP}_prob_Xtauhtaum[0] : -1.f")
-        .Define("ak8_Xte0",  f"n{_AK8}>=1 ? {_SGP}_prob_Xtauhtaue[0] : -1.f")
-        .Define("ak8_QCD0",  f"n{_AK8}>=1 ? {_SGP}_prob_QCD[0] : -1.f")
-        .Define("ak8_pt1",   f"n{_AK8}>=2 ? {_AK8}_pt[1] : -1.f")
-        .Define("ak8_eta1",  f"n{_AK8}>=2 ? {_AK8}_eta[1] : -99.f")
-        .Define("ak8_mass1", f"n{_AK8}>=2 ? {_AK8}_mass[1] : -1.f")
-        .Define("ak8_msd1",  f"n{_AK8}>=2 ? {_AK8}_msoftdrop[1] : -1.f")
-        .Define("ak8_Xbb1",  f"n{_AK8}>=2 ? {_SGP}_prob_Xbb[1] : -1.f")
-        .Define("ak8_Xtt1",  f"n{_AK8}>=2 ? {_SGP}_prob_Xtauhtauh[1] : -1.f")
-        .Define("ak8_Xtm1",  f"n{_AK8}>=2 ? {_SGP}_prob_Xtauhtaum[1] : -1.f")
-        .Define("ak8_Xte1",  f"n{_AK8}>=2 ? {_SGP}_prob_Xtauhtaue[1] : -1.f")
-        .Define("ak8_QCD1",  f"n{_AK8}>=2 ? {_SGP}_prob_QCD[1] : -1.f")
+        .Define("nFatJets",  f"(int)Sum({_AK8}_pt > {_AK8_PT_MIN}f)")
+        .Define("ak8_pt0",   f"{_has_ak8_0} ? {_AK8}_pt[0] : -1.f")
+        .Define("ak8_eta0",  f"{_has_ak8_0} ? {_AK8}_eta[0] : -99.f")
+        .Define("ak8_mass0", f"{_has_ak8_0} ? {_AK8}_mass[0] : -1.f")
+        .Define("ak8_msd0",  f"{_has_ak8_0} ? {_AK8}_msoftdrop[0] : -1.f")
+        .Define("ak8_Xbb0",  f"{_has_ak8_0} ? {_SGP}_prob_Xbb[0] : -1.f")
+        .Define("ak8_Xtt0",  f"{_has_ak8_0} ? {_SGP}_prob_Xtauhtauh[0] : -1.f")
+        .Define("ak8_Xtm0",  f"{_has_ak8_0} ? {_SGP}_prob_Xtauhtaum[0] : -1.f")
+        .Define("ak8_Xte0",  f"{_has_ak8_0} ? {_SGP}_prob_Xtauhtaue[0] : -1.f")
+        .Define("ak8_QCD0",  f"{_has_ak8_0} ? {_SGP}_prob_QCD[0] : -1.f")
+        .Define("ak8_pt1",   f"{_has_ak8_1} ? {_AK8}_pt[1] : -1.f")
+        .Define("ak8_eta1",  f"{_has_ak8_1} ? {_AK8}_eta[1] : -99.f")
+        .Define("ak8_mass1", f"{_has_ak8_1} ? {_AK8}_mass[1] : -1.f")
+        .Define("ak8_msd1",  f"{_has_ak8_1} ? {_AK8}_msoftdrop[1] : -1.f")
+        .Define("ak8_Xbb1",  f"{_has_ak8_1} ? {_SGP}_prob_Xbb[1] : -1.f")
+        .Define("ak8_Xtt1",  f"{_has_ak8_1} ? {_SGP}_prob_Xtauhtauh[1] : -1.f")
+        .Define("ak8_Xtm1",  f"{_has_ak8_1} ? {_SGP}_prob_Xtauhtaum[1] : -1.f")
+        .Define("ak8_Xte1",  f"{_has_ak8_1} ? {_SGP}_prob_Xtauhtaue[1] : -1.f")
+        .Define("ak8_QCD1",  f"{_has_ak8_1} ? {_SGP}_prob_QCD[1] : -1.f")
     )
     df = (df.Define("mjj_01",
                 "(float)(ROOT::Math::PtEtaPhiMVector("
