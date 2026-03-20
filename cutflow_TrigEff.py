@@ -492,6 +492,30 @@ def define_kinematics(df):
         .Define("nJets", "nScoutingPFJetRecluster")
         .Define("nLeptons", "nScoutingMuonVtx + nScoutingElectron")
     )
+    # -- AK8 fat jet kinematics + ScoutGlobalParT tagger --
+    _AK8 = "ScoutingFatPFJetRecluster"
+    _SGP = f"{_AK8}_scoutGlobalParT"
+    df = (df
+        .Define("nFatJets",  f"n{_AK8}")
+        .Define("ak8_pt0",   f"n{_AK8}>=1 ? {_AK8}_pt[0] : -1.f")
+        .Define("ak8_eta0",  f"n{_AK8}>=1 ? {_AK8}_eta[0] : -99.f")
+        .Define("ak8_mass0", f"n{_AK8}>=1 ? {_AK8}_mass[0] : -1.f")
+        .Define("ak8_msd0",  f"n{_AK8}>=1 ? {_AK8}_msoftdrop[0] : -1.f")
+        .Define("ak8_Xbb0",  f"n{_AK8}>=1 ? {_SGP}_prob_Xbb[0] : -1.f")
+        .Define("ak8_Xtt0",  f"n{_AK8}>=1 ? {_SGP}_prob_Xtauhtauh[0] : -1.f")
+        .Define("ak8_Xtm0",  f"n{_AK8}>=1 ? {_SGP}_prob_Xtauhtaum[0] : -1.f")
+        .Define("ak8_Xte0",  f"n{_AK8}>=1 ? {_SGP}_prob_Xtauhtaue[0] : -1.f")
+        .Define("ak8_QCD0",  f"n{_AK8}>=1 ? {_SGP}_prob_QCD[0] : -1.f")
+        .Define("ak8_pt1",   f"n{_AK8}>=2 ? {_AK8}_pt[1] : -1.f")
+        .Define("ak8_eta1",  f"n{_AK8}>=2 ? {_AK8}_eta[1] : -99.f")
+        .Define("ak8_mass1", f"n{_AK8}>=2 ? {_AK8}_mass[1] : -1.f")
+        .Define("ak8_msd1",  f"n{_AK8}>=2 ? {_AK8}_msoftdrop[1] : -1.f")
+        .Define("ak8_Xbb1",  f"n{_AK8}>=2 ? {_SGP}_prob_Xbb[1] : -1.f")
+        .Define("ak8_Xtt1",  f"n{_AK8}>=2 ? {_SGP}_prob_Xtauhtauh[1] : -1.f")
+        .Define("ak8_Xtm1",  f"n{_AK8}>=2 ? {_SGP}_prob_Xtauhtaum[1] : -1.f")
+        .Define("ak8_Xte1",  f"n{_AK8}>=2 ? {_SGP}_prob_Xtauhtaue[1] : -1.f")
+        .Define("ak8_QCD1",  f"n{_AK8}>=2 ? {_SGP}_prob_QCD[1] : -1.f")
+    )
     df = (df.Define("mjj_01",
                 "(float)(ROOT::Math::PtEtaPhiMVector("
                 "ScoutingPFJetRecluster_pt[0],ScoutingPFJetRecluster_eta[0],"
@@ -674,6 +698,23 @@ PLOT_VARS = [
     # -- Higgs candidate dijet masses --
     ("mbb_cand",     r"$m_{jj}^{H \to bb}$ candidate [GeV]",    25,   50,   200),
     ("mtautau_cand", r"$m_{jj}^{H \to \tau\tau}$ candidate [GeV]", 25, 0, 200),
+    # -- AK8 fat jets --
+    ("nFatJets",  r"Number of AK8 fat jets",                                      8,    0,     8),
+    ("ak8_pt0",   r"Leading AK8 $p_T$ [GeV]",                                   50,    0,  1000),
+    ("ak8_pt1",   r"Sub-leading AK8 $p_T$ [GeV]",                               50,    0,   800),
+    ("ak8_eta0",  r"Leading AK8 $\eta$",                                         30,   -5,     5),
+    ("ak8_eta1",  r"Sub-leading AK8 $\eta$",                                     30,   -5,     5),
+    ("ak8_mass0", r"Leading AK8 mass [GeV]",                                     40,    0,   400),
+    ("ak8_mass1", r"Sub-leading AK8 mass [GeV]",                                 40,    0,   400),
+    ("ak8_msd0",  r"Leading AK8 $m_{SD}$ [GeV]",                                40,    0,   300),
+    ("ak8_msd1",  r"Sub-leading AK8 $m_{SD}$ [GeV]",                            40,    0,   300),
+    ("ak8_Xbb0",  r"Leading AK8 ScoutGlobalParT $X_{bb}$",                      25,    0,     1),
+    ("ak8_Xbb1",  r"Sub-leading AK8 ScoutGlobalParT $X_{bb}$",                  25,    0,     1),
+    ("ak8_Xtt0",  r"Leading AK8 ScoutGlobalParT $X_{\tau_h\tau_h}$",            25,    0,     1),
+    ("ak8_Xtt1",  r"Sub-leading AK8 ScoutGlobalParT $X_{\tau_h\tau_h}$",        25,    0,     1),
+    ("ak8_Xtm0",  r"Leading AK8 ScoutGlobalParT $X_{\tau_\mu\tau_h}$",          25,    0,     1),
+    ("ak8_Xte0",  r"Leading AK8 ScoutGlobalParT $X_{\tau_e\tau_h}$",            25,    0,     1),
+    ("ak8_QCD0",  r"Leading AK8 ScoutGlobalParT QCD",                           25,    0,     1),
 ]
 
 # ── Filter variables if --plot-vars given ──
