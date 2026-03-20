@@ -701,10 +701,10 @@ PLOT_VARS = [
     # -- Higgs candidate dijet masses --
     ("mbb_cand",     r"$m_{jj}^{H \to bb}$ candidate [GeV]",    25,   50,   200),
     ("mtautau_cand", r"$m_{jj}^{H \to \tau\tau}$ candidate [GeV]", 25, 0, 200),
-    # -- AK8 fat jets --
+    # -- AK8 fat jets (pT > 150 GeV; entries with -1 are filtered at booking) --
     ("nFatJets",  r"Number of AK8 fat jets",                                      8,    0,     8),
-    ("ak8_pt0",   r"Leading AK8 $p_T$ [GeV]",                                   50,    0,  1000),
-    ("ak8_pt1",   r"Sub-leading AK8 $p_T$ [GeV]",                               50,    0,   800),
+    ("ak8_pt0",   r"Leading AK8 $p_T$ [GeV]",                                   50,  150,  1000),
+    ("ak8_pt1",   r"Sub-leading AK8 $p_T$ [GeV]",                               50,  150,   800),
     ("ak8_eta0",  r"Leading AK8 $\eta$",                                         30,   -5,     5),
     ("ak8_eta1",  r"Sub-leading AK8 $\eta$",                                     30,   -5,     5),
     ("ak8_mass0", r"Leading AK8 mass [GeV]",                                     40,    0,   400),
@@ -905,6 +905,9 @@ if not _cache_loaded:
 
     mc_denom_groups = _build_groups(mc_acc)
     
+    # AK8 variables use -1 sentinel when no jet passes pT cut; filter those out
+    _AK8_VARS = {v[0] for v in PLOT_VARS if v[0].startswith("ak8_")}
+
     denom_book = {}
     for var_name, _xlabel, nbins, vmin, vmax in PLOT_VARS:
         denom_book[var_name] = []
@@ -912,7 +915,8 @@ if not _cache_loaded:
             group_ptrs = []
             for si, df in enumerate(dfs):
                 uid = f"denom_{var_name}_{gi}_{si}"
-                ptr = df.Histo1D(
+                df_v = df.Filter(f"{var_name} > -0.5f") if var_name in _AK8_VARS else df
+                ptr = df_v.Histo1D(
                     (f"h_{uid}", f";{var_name};Events", nbins, vmin, vmax),
                     var_name, "w")
                 group_ptrs.append(ptr)
@@ -942,7 +946,8 @@ if not _cache_loaded:
                 group_ptrs = []
                 for si, df in enumerate(dfs):
                     uid = f"{trig_name}_{var_name}_{gi}_{si}"
-                    ptr = df.Histo1D(
+                    df_v = df.Filter(f"{var_name} > -0.5f") if var_name in _AK8_VARS else df
+                    ptr = df_v.Histo1D(
                         (f"h_{uid}", f";{var_name};Events", nbins, vmin, vmax),
                         var_name, "w")
                     group_ptrs.append(ptr)
