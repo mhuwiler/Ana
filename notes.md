@@ -48,7 +48,7 @@
 
 - Updated luminosity to brilcalc value (103.965 fb⁻¹)
 - Fixed b-tagger: BvsAll excludes `prob_bb` (AK8-only variable)
-- Added `--max-files` for data file limiting (replaces Range() which breaks ImplicitMT)
+- Added `--max-mc-files` for data file limiting (replaces Range() which breaks ImplicitMT)
 - Created PDF maker tool
 
 ### 2026-03-08 – 2026-03-09
@@ -138,18 +138,18 @@ Missing HT bins: 400-600 and 600-800 (not produced on EOS).
 
 ```bash
 # Full run (all vars, all plot types)
-python cutflow_TrigEff.py --theme light --max-files 10 --no-data --nthreads 4
+python cutflow_TrigEff.py --theme light --max-mc-files 10 --no-data --nthreads 4
 
 # Quick test (1 var, shapes only, skip cutflow)
-python cutflow_TrigEff.py --theme light --max-files 10 --no-data --nthreads 4 \
+python cutflow_TrigEff.py --theme light --max-mc-files 10 --no-data --nthreads 4 \
     --plot-vars "ak4_pt0" --plot-type shape --skip-cutflow
 
 # With data overlay (drop --no-data, uses XCache)
-python cutflow_TrigEff.py --theme light --max-files 10 --nthreads 4 \
+python cutflow_TrigEff.py --theme light --max-mc-files 10 --nthreads 4 \
     --recache --overwrite --plot-vars "ak4_pt0"
 
 # Force rebuild everything
-python cutflow_TrigEff.py --theme light --max-files 10 --no-data --nthreads 4 \
+python cutflow_TrigEff.py --theme light --max-mc-files 10 --no-data --nthreads 4 \
     --recache --overwrite
 
 # GenXSecAnalyzer (needs cmsenv in separate shell, NOT pixi)
@@ -166,6 +166,6 @@ cd scripts/ && source run_xsec.sh <index>
 ## Known Issues
 
 - Scouting ParticleNet b-tagging is fundamentally poor (limited tracking info, wp=0.1)
-- `Range()` incompatible with `EnableImplicitMT()` — use `--max-files` instead
+- `Range()` incompatible with `EnableImplicitMT()` — use `--max-mc-files` instead
 - Segfault after cache save with 10 files — fixed with `gc.collect()` + `ROOT.gROOT.GetListOfFiles().Clear()`
 - DY PTLL-600 has 3080 files (large stats) — may dominate memory usage
