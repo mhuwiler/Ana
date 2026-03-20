@@ -1,4 +1,47 @@
-# Working Notes
+# Working Notes — HH→bbττ Scouting Analysis
+
+---
+
+## Activity Log
+
+### 2026-03-20
+
+- Ran GenXSecAnalyzer for all 7 QCD-4Jets HT-binned samples — cross sections
+  updated in `config/samples.yaml` (were off by 10-100x from placeholder values)
+- Added QCD multijet (mode 30) to DECAY_MODES LUT — now 12 MC groups total
+  (5 DY + 3 TT + 3 Signal + 1 QCD). QCD skips decayMode filter (no gen matching)
+- Cutflow table now shows DY, TT, QCD, Signal columns with S/√B including QCD in B
+- Created `des/cpp_engine.md` — full C++ engine reference doc
+- Committed and pushed all changes to `scouting` branch
+
+### 2026-03-19
+
+- Implemented `GlobalDecayMode()` C++ function in `elements/GenMatching.C`
+  - Unified decay mode numbering: 1-5 (DY), 10-12 (TT), 20-22 (Signal), 30 (QCD)
+  - Added NanoAOD type overloads (RVec<short>, RVec<unsigned short>) to fix
+    segfaults from implicit type conversion + ImplicitMT
+- Fixed `common.h` symbol conflicts with legacy `HHbbtautauAnaElements.C`
+  - Moved `deltaPhi`, `deltaR`, `isLastCopy`, `isHardProcess`, `fromHardProcess`
+    to anonymous namespaces in GenMatching.C and RecoObjects.C
+- Fixed segfault after histogram cache save — added `gc.collect()` +
+  `ROOT.gROOT.GetListOfFiles().Clear()` barrier before Phase 3 plotting
+- Verified pixi env works end-to-end (compilation + event loop + plotting)
+
+### 2026-03-18
+
+- Restructured `Ana/` for scouting analysis
+  - Created `elements/` folder with `common.h`, `GenMatching.C`, `RecoObjects.C`
+  - Moved legacy code (`HHbbtautauAnaElements.C`, `Particle.h`) to `legacy/`
+  - Removed legacy Jupyter notebooks from `legacy/`
+- Added `output/` and `logs/` to `.gitignore`
+- Set up pixi environment at `/work/users/das214/pixi/ana/`
+  - Pixi can't build under `/home/` (Purdue AF policy)
+  - Workflow: `pixi shell` from `/work/`, then `cd` to `/home/.../Ana/`
+- Added trigger overlay plots (Phase 3.5) and per-channel signal overlays
+- Added `--plot-vars`, `--recache`, `--skip-cutflow` CLI flags
+- Implemented histogram cache (`.hist_cache.root`) with auto-invalidation
+
+---
 
 ## Environment Setup
 
@@ -51,11 +94,15 @@ python cutflow_TrigEff.py --theme light --max-files 10 --no-data --nthreads 4
 python cutflow_TrigEff.py --theme light --max-files 10 --no-data --nthreads 4 \
     --plot-vars "ak4_pt0" --plot-type shape --skip-cutflow
 
+# With data overlay (drop --no-data, uses XCache)
+python cutflow_TrigEff.py --theme light --max-files 10 --nthreads 4 \
+    --recache --overwrite --plot-vars "ak4_pt0"
+
 # Force rebuild everything
 python cutflow_TrigEff.py --theme light --max-files 10 --no-data --nthreads 4 \
     --recache --overwrite
 
-# GenXSecAnalyzer (needs cmsenv, NOT pixi)
+# GenXSecAnalyzer (needs cmsenv in separate shell, NOT pixi)
 cd scripts/ && source run_xsec.sh <index>
 ```
 
