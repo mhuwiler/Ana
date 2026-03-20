@@ -796,10 +796,8 @@ def plot_stacked_with_significance(
     bkg_indices : list of int
         Indices into h_mc_list that are background (summed for B).
     """
-    if sig_indices is None:
-        sig_indices = [2, 3, 4]  # default: hh, hm, he
-    if bkg_indices is None:
-        bkg_indices = [0, 1]     # default: DY, TT
+    if sig_indices is None or bkg_indices is None:
+        raise ValueError("sig_indices and bkg_indices must be provided")
 
     if h_data is not None:
         edges, data_vals, data_errs = th1_to_np(h_data)

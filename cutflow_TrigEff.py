@@ -144,8 +144,12 @@ _CACHE_VERSION = 1   # bump to invalidate all caches
 _INVALIDATION_FILES = [
     "cutflow_TrigEff.py",
     "config/samples.yaml",
-    "HHbbtautauAnaElements.C",
-    "Particle.h",
+    "elements/GenMatching.C",
+    "elements/RecoObjects.C",
+    "elements/common.h",
+    "config/objects.yaml",
+    "config/acceptance.yaml",
+    "config/regions.yaml",
 ]
 
 
@@ -288,11 +292,9 @@ os.chdir(ANA_DIR)
 sys.path.insert(0, ANA_DIR)
 
 ROOT.gInterpreter.AddIncludePath(ANA_DIR)
-BUILD_DIR = os.path.join(ANA_DIR, "build")
-os.makedirs(BUILD_DIR, exist_ok=True)
-ROOT.gSystem.SetBuildDir(BUILD_DIR)
-ROOT.gROOT.LoadMacro("Particle.h+")
-ROOT.gROOT.LoadMacro("HHbbtautauAnaElements.C+")
+# ACLiC puts .so files next to source; .gitignore handles them
+ROOT.gROOT.LoadMacro("elements/GenMatching.C+")
+ROOT.gROOT.LoadMacro("elements/RecoObjects.C+")
 
 ROOT.gErrorIgnoreLevel = ROOT.kInfo
 ROOT.ROOT.EnableImplicitMT(ARGS.nthreads)
@@ -302,6 +304,28 @@ print("sys.path[0] =", sys.path[0])
 
 
 BTAG_WP = 0.1  # loose b-tag working point for cutflow
+
+# ── Global decay mode LUT ──
+# Maps GlobalDecayMode() return value → process, label, color.
+# Gap-based numbering: DY=1-5, TT=10-12, HH=20-22, room for QCD=30+, W=40+.
+DECAY_MODES = {
+    0:  {"process": "unknown",  "label": "Unknown",                          "color": "gray"},
+    1:  {"process": "DY",       "label": r"DY (Z$\to$ee)",                   "color": "gold"},
+    2:  {"process": "DY",       "label": r"DY (Z$\to\mu\mu$)",              "color": "orange"},
+    3:  {"process": "DY",       "label": r"DY (Z$\to\tau_h\tau_h$)",        "color": "darkorange"},
+    4:  {"process": "DY",       "label": r"DY (Z$\to\tau_\mu\tau_h$)",      "color": "coral"},
+    5:  {"process": "DY",       "label": r"DY (Z$\to\tau_e\tau_h$)",        "color": "tomato"},
+    10: {"process": "TT",       "label": r"TT (had)",                        "color": "limegreen"},
+    11: {"process": "TT",       "label": r"TT (semi)",                       "color": "forestgreen"},
+    12: {"process": "TT",       "label": r"TT (dilep)",                      "color": "teal"},
+    20: {"process": "HHbbtt",   "label": r"$HH\to bb\tau_h\tau_h$",         "color": "tab:red"},
+    21: {"process": "HHbbtt",   "label": r"$HH\to bb\tau_\mu\tau_h$",       "color": "tab:pink"},
+    22: {"process": "HHbbtt",   "label": r"$HH\to bb\tau_e\tau_h$",         "color": "tab:purple"},
+    30: {"process": "QCD",      "label": "QCD multijet",                     "color": "tab:cyan"},
+}
+BKG_MODES = [1, 2, 3, 4, 5, 10, 11, 12, 30]
+SIG_MODES = [20, 21, 22]
+ACTIVE_MODES = BKG_MODES + SIG_MODES
 
 # Per-trigger brilcalc data: {run: {"lumi": fb, "ncms": int}}
 BRILCALC_FILES = {
@@ -418,6 +442,7 @@ for sample_name, df in mc_dfs.items():
 dy_samples  = list(group_files_by_sample["DY"].keys())
 tt_samples  = list(group_files_by_sample["TT"].keys())
 sig_samples = list(group_files_by_sample["HHbbtt"].keys())
+qcd_samples = list(group_files_by_sample.get("QCD", {}).keys())
 
 
 
@@ -426,18 +451,18 @@ sig_samples = list(group_files_by_sample["HHbbtt"].keys())
 # Gen-level columns
 # ──────────────────────────────────────────────────────────────────────────────
 
-gen_decay_expr = (
-    "Ana::DecayGenMatching({0}_pdgId, {0}_genPartIdxMother, {0}_statusFlags)"
-    .format("GenPart")
-)
+_GP = "GenPart"
+decay_mode_expr = f"Ana::GlobalDecayMode({_GP}_pdgId, {_GP}_genPartIdxMother, {_GP}_statusFlags)"
+gen_hh_expr     = f"Ana::HHGenMatching({_GP}_pdgId, {_GP}_genPartIdxMother, {_GP}_statusFlags)"
 
 for name in mc:
-    mc[name] = mc[name].Define("GenDecay", gen_decay_expr)
+    mc[name] = mc[name].Define("decayMode", decay_mode_expr)
 
 for name in sig_samples:
     mc[name] = (mc[name]
-        .Define("genHbb_idx",       "(int)GenDecay.Htob")
-        .Define("genHtautau_idx",   "(int)GenDecay.Htotau")
+        .Define("gen_HH",           gen_hh_expr)
+        .Define("genHbb_idx",       "(int)gen_HH.Htob")
+        .Define("genHtautau_idx",   "(int)gen_HH.Htotau")
         .Define("genHbb_p4",        "Ana::getP4(genHbb_idx, GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass)")
         .Define("genHtautau_p4",    "Ana::getP4(genHtautau_idx, GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass)")
         .Define("gen_mHH",          "(genHbb_p4 + genHtautau_p4).M()")
@@ -750,22 +775,16 @@ if not _cache_loaded:
             data_sel = data_acc
             mc_sel = dict(mc_acc)
     
-        # Signal decay channels
-        hh = [mc_sel[s].Filter("GenDecay.decayType==1") for s in sig_samples]
-        hm = [mc_sel[s].Filter("GenDecay.decayType==2") for s in sig_samples]
-        he = [mc_sel[s].Filter("GenDecay.decayType==3") for s in sig_samples]
-    
         sig_mHH_ptrs = [mc_sel[s].Histo1D(
             (f"h_mHH_{s}_{trig_name}",
              "m_{HH} gen-level;m_{HH} [GeV];Events", 32, 0, 800),
             "gen_mHH", "w") for s in sig_samples]
         unified_ptrs.extend(sig_mHH_ptrs)
-    
+
         # Store selections for the plotting phase
         trig_selections[trig_name] = {
             "trig": trig,
             "data_sel": data_sel, "mc_sel": mc_sel,
-            "hh": hh, "hm": hm, "he": he,
             "sig_mHH_ptrs": sig_mHH_ptrs,
         }
     
@@ -794,34 +813,53 @@ if not _cache_loaded:
             data_n_ptr = data_sel.Count() if data_sel is not None else None
             sum_w  = {s: mc_sel[s].Sum("w") for s in mc_sel}
             sum_w2 = {s: mc_sel[s].Define("w2", "w*w").Sum("w2") for s in mc_sel}
-            hh_w = [d.Sum("w") for d in hh]
-            hm_w = [d.Sum("w") for d in hm]
-            he_w = [d.Sum("w") for d in he]
-    
+
+            # Per-mode yield sums (for cutflow table)
+            mode_w = {}  # mode_int -> [Sum ptrs]
+            for mode in ACTIVE_MODES:
+                info = DECAY_MODES[mode]
+                proc = info["process"]
+                if proc == "DY":      samples_for_mode = dy_samples
+                elif proc == "TT":    samples_for_mode = tt_samples
+                elif proc == "HHbbtt": samples_for_mode = sig_samples
+                else: continue
+                mode_w[mode] = [mc_sel[s].Filter(f"decayMode=={mode}").Sum("w")
+                                for s in samples_for_mode]
+                unified_ptrs.extend(mode_w[mode])
+
             if data_n_ptr is not None:
                 unified_ptrs.append(data_n_ptr)
             unified_ptrs.extend(sum_w.values())
             unified_ptrs.extend(sum_w2.values())
-            unified_ptrs.extend(hh_w + hm_w + he_w)
-    
+
             _phase1_data[trig_name] = {
                 "cutflow_ptrs": cutflow_ptrs,
                 "data_n_ptr": data_n_ptr,
                 "sum_w": sum_w, "sum_w2": sum_w2,
-                "hh_w": hh_w, "hm_w": hm_w, "he_w": he_w,
+                "mode_w": mode_w,
             }
     
     # ── Phase 2: Book MC denominator histograms (no trigger) ──
-    mc_denom_groups = [
-        ([mc_acc[s] for s in dy_samples],  "DY",  "tab:orange"),
-        ([mc_acc[s] for s in tt_samples],  "TT",  "tab:green"),
-        ([mc_acc[s].Filter("GenDecay.decayType==1") for s in sig_samples],
-         r"$HH\to bb\tau_h\tau_h$", "tab:red"),
-        ([mc_acc[s].Filter("GenDecay.decayType==2") for s in sig_samples],
-         r"$HH\to bb\tau_\mu\tau_h$", "tab:pink"),
-        ([mc_acc[s].Filter("GenDecay.decayType==3") for s in sig_samples],
-         r"$HH\to bb\tau_e\tau_h$", "tab:purple"),
-    ]
+    # Build mc_denom_groups from global decay mode LUT
+    def _build_groups(sample_dfs):
+        """Build mc_groups list from ACTIVE_MODES using decayMode filter."""
+        groups = []
+        for mode in ACTIVE_MODES:
+            info = DECAY_MODES[mode]
+            proc = info["process"]
+            if proc == "DY":       slist = dy_samples
+            elif proc == "TT":     slist = tt_samples
+            elif proc == "HHbbtt": slist = sig_samples
+            elif proc == "QCD":    slist = qcd_samples
+            else: continue
+            if proc == "QCD":
+                dfs = [sample_dfs[s] for s in slist]  # no decayMode filter
+            else:
+                dfs = [sample_dfs[s].Filter(f"decayMode=={mode}") for s in slist]
+            groups.append((dfs, info["label"], info["color"]))
+        return groups
+
+    mc_denom_groups = _build_groups(mc_acc)
     
     denom_book = {}
     for var_name, _xlabel, nbins, vmin, vmax in PLOT_VARS:
@@ -841,18 +879,15 @@ if not _cache_loaded:
     mc_items_by_trig = {}
     _histo_books = {}  # trig_name -> {var_name -> [[ptrs per group]]}
     
+    # Derive sig/bkg indices from ACTIVE_MODES ordering
+    sig_indices = [i for i, m in enumerate(ACTIVE_MODES) if m in SIG_MODES]
+    bkg_indices = [i for i, m in enumerate(ACTIVE_MODES) if m in BKG_MODES]
+
     for trig_name in trig_selections:
         sel = trig_selections[trig_name]
         mc_sel = sel["mc_sel"]
-        hh, hm, he = sel["hh"], sel["hm"], sel["he"]
-    
-        mc_groups = [
-            ([mc_sel[s] for s in dy_samples], "DY",                              "tab:orange"),
-            ([mc_sel[s] for s in tt_samples], "TT",                              "tab:green"),
-            (hh,                              r"$HH\to bb\tau_h\tau_h$",         "tab:red"),
-            (hm,                              r"$HH\to bb\tau_\mu\tau_h$",       "tab:pink"),
-            (he,                              r"$HH\to bb\tau_e\tau_h$",         "tab:purple"),
-        ]
+
+        mc_groups = _build_groups(mc_sel)
         mc_items = [{"label": lbl, "color": col} for _, lbl, col in mc_groups]
         mc_items_by_trig[trig_name] = mc_items
     
@@ -907,48 +942,52 @@ if not _cache_loaded:
                 data_n_cf = d_ptr.GetValue() if d_ptr is not None else -1
                 dy_cf  = sum(w_ptrs[s].GetValue() for s in dy_samples) * LUMI
                 tt_cf  = sum(w_ptrs[s].GetValue() for s in tt_samples) * LUMI
+                qcd_cf = sum(w_ptrs[s].GetValue() for s in qcd_samples) * LUMI if qcd_samples else 0.0
                 sig_cf = sum(w_ptrs[s].GetValue() for s in sig_samples) * LUMI
-                B_cf = dy_cf + tt_cf
+                B_cf = dy_cf + tt_cf + qcd_cf
                 s_sqrtb = sig_cf / math.sqrt(B_cf) if B_cf > 0 else float("nan")
                 z_a = asimov_significance(sig_cf, B_cf)
                 cutflow_rows.append(
-                    (step_name, data_n_cf, dy_cf, tt_cf, sig_cf, s_sqrtb, z_a))
+                    (step_name, data_n_cf, dy_cf, tt_cf, qcd_cf, sig_cf, s_sqrtb, z_a))
             cutflow_tables[trig_name] = cutflow_rows
     
             print(f"\n{'Cut':<30s} {'Data':>12s} {'DY':>14s} {'TT':>14s} "
-                  f"{'Signal':>14s} {'S/√B':>10s} {'Z_A':>10s}")
-            print("-" * 108)
+                  f"{'QCD':>14s} {'Signal':>14s} {'S/√B':>10s} {'Z_A':>10s}")
+            print("-" * 122)
             for row in cutflow_rows:
-                step, dn, dy, tt, sig, sb, za = row
+                step, dn, dy, tt, qcd, sig, sb, za = row
                 dn_str = f"{dn:>12d}" if dn >= 0 else f"{'(no data)':>12s}"
                 print(f"{step:<30s} {dn_str} {dy:>14.4g} {tt:>14.4g} "
-                      f"{sig:>14.4g} {sb:>10.4g} {za:>10.4g}")
+                      f"{qcd:>14.4g} {sig:>14.4g} {sb:>10.4g} {za:>10.4g}")
     
             data_n_ptr = p1["data_n_ptr"]
             sum_w, sum_w2 = p1["sum_w"], p1["sum_w2"]
-            hh_w, hm_w, he_w = p1["hh_w"], p1["hm_w"], p1["he_w"]
+            mode_w = p1["mode_w"]
             data_n = data_n_ptr.GetValue() if data_n_ptr is not None else -1
-    
+
             def group_yield(samples):
                 y = sum(sum_w[s].GetValue() for s in samples) * LUMI
                 yerr = math.sqrt(sum(sum_w2[s].GetValue() for s in samples)) * LUMI
                 return y, yerr
-    
+
             dy_y, dy_yerr = group_yield(dy_samples)
             tt_y, tt_yerr = group_yield(tt_samples)
+            qcd_y, qcd_yerr = group_yield(qcd_samples) if qcd_samples else (0.0, 0.0)
             sig_y, sig_yerr = group_yield(sig_samples)
-            y_hh = sum(d.GetValue() for d in hh_w) * LUMI
-            y_hm = sum(d.GetValue() for d in hm_w) * LUMI
-            y_he = sum(d.GetValue() for d in he_w) * LUMI
-            B = dy_y + tt_y
+            B = dy_y + tt_y + qcd_y
             S_over_sqrtB = sig_y / math.sqrt(B) if B > 0 else float("nan")
-    
+
             print(f"\nData events: {data_n if data_n >= 0 else '(no data)'}")
             print(f"DY yield:    {dy_y:.6g} +/- {dy_yerr:.3g}")
             print(f"TT yield:    {tt_y:.6g} +/- {tt_yerr:.3g}")
+            print(f"QCD yield:   {qcd_y:.6g} +/- {qcd_yerr:.3g}")
             print(f"SIG yield:   {sig_y:.6g} +/- {sig_yerr:.3g}")
             print(f"S/sqrt(B):   {S_over_sqrtB:.6g}")
-            print(f"y_hh:y_hm:y_he: {y_hh:.6g}:{y_hm:.6g}:{y_he:.6g}\n")
+            # Per-mode yields
+            for mode in ACTIVE_MODES:
+                y_mode = sum(d.GetValue() for d in mode_w[mode]) * LUMI
+                print(f"  mode {mode:>2d} ({DECAY_MODES[mode]['label']:>25s}): {y_mode:.6g}")
+            print()
     
         # ── Write cutflow markdown ──
         cutflow_path = os.path.join(PLOT_DIR, "cutflow.md")
@@ -957,13 +996,13 @@ if not _cache_loaded:
             f.write(f"Luminosity: {LUMI} fb$^{{-1}}$\n\n")
             for trig_name, rows in cutflow_tables.items():
                 f.write(f"## {trig_name}\n\n")
-                f.write("| Cut | Data | DY | TT | Signal "
+                f.write("| Cut | Data | DY | TT | QCD | Signal "
                         "| S/sqrt(B) | Z_A (Asimov) |\n")
-                f.write("|-----|-----:|---:|---:|-------:"
+                f.write("|-----|-----:|---:|---:|----:|-------:"
                         "|----------:|-------------:|\n")
-                for step, dn, dy, tt, sig, sb, za in rows:
+                for step, dn, dy, tt, qcd, sig, sb, za in rows:
                     f.write(f"| {step} | {dn:,d} | {dy:.4g} | {tt:.4g} "
-                            f"| {sig:.4g} | {sb:.4g} | {za:.4g} |\n")
+                            f"| {qcd:.4g} | {sig:.4g} | {sb:.4g} | {za:.4g} |\n")
                 f.write("\n")
         print(f"Cutflow table saved: {cutflow_path}")
     else:
@@ -1006,6 +1045,13 @@ if not _cache_loaded:
     save_hist_cache(_cache_path, mc_hists_by_trig, mc_denom_hists,
                     mc_items_by_trig, LUMI, _expected_meta)
 
+    # Drop lazy action pointers — they hold references to internal ROOT objects
+    # that can cause double-free after RunGraphs with ImplicitMT.
+    del unified_ptrs, _histo_books, denom_book
+    if '_phase1_data' in dir():
+        del _phase1_data
+    import gc; gc.collect()
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Phase 3 — Draw MC-only plots  (no event loop, just drawing)
@@ -1018,11 +1064,8 @@ for trig_name in trig_selections:
 
     # Comparison: gen mHH vs signal m4j (MC only, data added in Phase 5)
     mHH_path = os.path.join(PLOT_DIR, "shape", f"{trig_name}_mHH_m4j.png")
-    if not sel["sig_mHH_ptrs"]:
-        pass  # skip when loaded from cache (no lazy ptrs available)
-    elif os.path.exists(mHH_path) and not ARGS.overwrite:
-        print(f"Skipping (exists): {mHH_path}")
-    else:
+    if (sel["sig_mHH_ptrs"] and "m4j" in h_by_var
+            and (not os.path.exists(mHH_path) or ARGS.overwrite)):
         fig, ax = plt.subplots(figsize=(8, 6))
 
         # 1) gen mHH (combine signal samples)
@@ -1036,10 +1079,10 @@ for trig_name in trig_selections:
         ax.step(edges, np.r_[vals, vals[-1]], where="post",
                 linewidth=2, color="tab:blue", label=r"$m_{HH}$ gen-level (signal)")
 
-        # 2) signal m4j (reco) — combine hh + hm + he (groups 2,3,4)
-        h_sig_m4j = h_by_var["m4j"][2].Clone("h_sig_m4j_combined")
-        h_sig_m4j.Add(h_by_var["m4j"][3])
-        h_sig_m4j.Add(h_by_var["m4j"][4])
+        # 2) signal m4j (reco) — combine all signal channels
+        h_sig_m4j = h_by_var["m4j"][sig_indices[0]].Clone("h_sig_m4j_combined")
+        for si in sig_indices[1:]:
+            h_sig_m4j.Add(h_by_var["m4j"][si])
         edges2, vals2, _ = th1_to_np(h_sig_m4j)
         area2 = float(np.sum(vals2 * np.diff(edges2)))
         if area2 > 0:
@@ -1056,6 +1099,8 @@ for trig_name in trig_selections:
         fig.savefig(mHH_path, dpi=150)
         print(f"Saved: {mHH_path}")
         plt.close(fig)
+    elif os.path.exists(mHH_path) and not ARGS.overwrite:
+        print(f"Skipping (exists): {mHH_path}")
 
     # MC-only stacked & shape plots
     for var_name, xlabel, nbins, vmin, vmax in PLOT_VARS:
@@ -1114,7 +1159,7 @@ for trig_name in trig_selections:
             else:
                 fig, ax, rax = plot_stacked_with_significance(
                     h_mc_list, mc_items,
-                    sig_indices=[2, 3, 4], bkg_indices=[0, 1],
+                    sig_indices=sig_indices, bkg_indices=bkg_indices,
                     logy=True, title=None)
                 rax.set_xlabel(xlabel)
                 cms_label(ax, lumi=LUMI)
@@ -1156,9 +1201,9 @@ if do_shape:
 
     # Per-signal-channel trigger overlays
     SIG_CHANNELS = [
-        (2, "hh", r"$HH\to bb\tau_h\tau_h$"),
-        (3, "hm", r"$HH\to bb\tau_\mu\tau_h$"),
-        (4, "he", r"$HH\to bb\tau_e\tau_h$"),
+        (sig_indices[0], "hh", r"$HH\to bb\tau_h\tau_h$"),
+        (sig_indices[1], "hm", r"$HH\to bb\tau_\mu\tau_h$"),
+        (sig_indices[2], "he", r"$HH\to bb\tau_e\tau_h$"),
     ]
     for var_name, xlabel, nbins, vmin, vmax in PLOT_VARS:
         for gi, ch_key, ch_label in SIG_CHANNELS:
@@ -1318,7 +1363,7 @@ if not ARGS.no_data:
                 else:
                     fig, ax, rax = plot_stacked_with_significance(
                         h_mc_list, mc_items, h_data=h_data,
-                        sig_indices=[2, 3, 4], bkg_indices=[0, 1],
+                        sig_indices=sig_indices, bkg_indices=bkg_indices,
                         logy=True, title=None)
                     rax.set_xlabel(xlabel)
                     cms_label(ax, lumi=LUMI)
@@ -1329,12 +1374,9 @@ if not ARGS.no_data:
 
         # Comparison: gen mHH vs signal m4j vs data m4j
         sel = trig_selections[trig_name]
-        cmp_path = os.path.join(PLOT_DIR, f"{trig_name}_data_shape_mHH_m4j.png")
-        if not sel["sig_mHH_ptrs"]:
-            pass  # skip when loaded from cache (no lazy ptrs available)
-        elif os.path.exists(cmp_path) and not ARGS.overwrite:
-            print(f"Skipping (exists): {cmp_path}")
-        else:
+        cmp_path = os.path.join(PLOT_DIR, "data_shape", f"{trig_name}_mHH_m4j.png")
+        if (sel["sig_mHH_ptrs"] and "m4j" in h_by_var
+                and (not os.path.exists(cmp_path) or ARGS.overwrite)):
             fig, ax = plt.subplots(figsize=(8, 6))
 
             # 1) gen mHH (signal)
@@ -1349,9 +1391,9 @@ if not ARGS.no_data:
                     linewidth=2, color="tab:blue", label=r"$m_{HH}$ gen-level (signal)")
 
             # 2) signal m4j (reco)
-            h_sig_m4j = h_by_var["m4j"][2].Clone("h_sig_m4j_cmp")
-            h_sig_m4j.Add(h_by_var["m4j"][3])
-            h_sig_m4j.Add(h_by_var["m4j"][4])
+            h_sig_m4j = h_by_var["m4j"][sig_indices[0]].Clone("h_sig_m4j_cmp")
+            for si in sig_indices[1:]:
+                h_sig_m4j.Add(h_by_var["m4j"][si])
             edges2, vals2, _ = th1_to_np(h_sig_m4j)
             area2 = float(np.sum(vals2 * np.diff(edges2)))
             if area2 > 0:

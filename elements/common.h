@@ -36,6 +36,14 @@ constexpr float TAU_MASS = 1.77686f;
 // Result structs
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Shared: dijet pair from mass-window pairing
+struct DijetPair {
+    int   i1   = -1;   // index of jet 1
+    int   i2   = -1;   // index of jet 2
+    float mass = -1.f; // invariant mass [GeV]
+    bool  found() const { return i1 >= 0 && i2 >= 0; }
+};
+
 // Shared: opposite-sign same-flavour dilepton pair
 struct DileptonPair {
     int   i1         = -1;   // index of lepton 1 in collection
@@ -97,30 +105,13 @@ struct GenHHResult {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Angular utilities
+// Angular utilities and gen status flag helpers
+//
+// NOTE: These are defined in HHbbtautauAnaElements.C as well (in namespace Ana).
+// When both .so files are loaded, Cling sees duplicate definitions.
+// We OMIT them here to avoid conflicts — the legacy definitions are used.
+// The .C files that need them include local copies in their anonymous namespace.
 // ─────────────────────────────────────────────────────────────────────────────
-
-inline double deltaPhi(double phi1, double phi2) {
-    double dphi = phi1 - phi2;
-    while (dphi >  M_PI) dphi -= 2.0 * M_PI;
-    while (dphi < -M_PI) dphi += 2.0 * M_PI;
-    return dphi;
-}
-
-inline double deltaR(double eta1, double phi1, double eta2, double phi2) {
-    double deta = eta1 - eta2;
-    double dphi = deltaPhi(phi1, phi2);
-    return std::sqrt(deta * deta + dphi * dphi);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Gen particle status flag helpers
-// (same bit definitions as HHbbtautauAnaElements.C)
-// ─────────────────────────────────────────────────────────────────────────────
-
-inline bool isLastCopy(int flags)      { return (flags >> 13) & 1; }
-inline bool isHardProcess(int flags)   { return (flags >>  7) & 1; }
-inline bool fromHardProcess(int flags) { return (flags >>  8) & 1; }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Gen particle tree traversal

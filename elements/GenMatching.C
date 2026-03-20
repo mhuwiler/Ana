@@ -37,6 +37,23 @@ namespace Ana {
 
 namespace {
 
+// Local copies of angular/status-flag helpers to avoid symbol conflicts
+// with HHbbtautauAnaElements.C when both .so files are loaded.
+double deltaPhi_(double phi1, double phi2) {
+    double dphi = phi1 - phi2;
+    while (dphi >  M_PI) dphi -= 2.0 * M_PI;
+    while (dphi < -M_PI) dphi += 2.0 * M_PI;
+    return dphi;
+}
+double deltaR_(double eta1, double phi1, double eta2, double phi2) {
+    double deta = eta1 - eta2;
+    double dphi = deltaPhi_(phi1, phi2);
+    return std::sqrt(deta * deta + dphi * dphi);
+}
+bool isLastCopy_(int flags)      { return (flags >> 13) & 1; }
+bool isHardProcess_(int flags)   { return (flags >>  7) & 1; }
+bool fromHardProcess_(int flags) { return (flags >>  8) & 1; }
+
 // Find all gen particles whose mother is `parent_idx` (direct daughters only).
 std::vector<int> directDaughters(int parent_idx,
                                  const ROOT::RVec<int>& mothers) {
@@ -60,7 +77,7 @@ std::vector<int> findDescendantsByPdgId(
     std::vector<int> result;
     for (int i = 0; i < (int)pdgId.size(); ++i) {
         if (std::abs(pdgId[i]) != target_abs_pdgid) continue;
-        if (require_last_copy && !isLastCopy(statusFlags[i])) continue;
+        if (require_last_copy && !isLastCopy_(statusFlags[i])) continue;
         if (isDescendantOf(i, ancestor_idx, mothers)) result.push_back(i);
     }
     return result;
@@ -72,7 +89,7 @@ int findFirstLastCopy(int target_abs_pdgid,
                       const ROOT::RVec<int>& pdgId,
                       const ROOT::RVec<int>& statusFlags) {
     for (int i = 0; i < (int)pdgId.size(); ++i) {
-        if (std::abs(pdgId[i]) == target_abs_pdgid && isLastCopy(statusFlags[i]))
+        if (std::abs(pdgId[i]) == target_abs_pdgid && isLastCopy_(statusFlags[i]))
             return i;
     }
     return -1;
@@ -84,7 +101,7 @@ std::vector<int> findAllLastCopies(int target_abs_pdgid,
                                    const ROOT::RVec<int>& statusFlags) {
     std::vector<int> result;
     for (int i = 0; i < (int)pdgId.size(); ++i) {
-        if (std::abs(pdgId[i]) == target_abs_pdgid && isLastCopy(statusFlags[i]))
+        if (std::abs(pdgId[i]) == target_abs_pdgid && isLastCopy_(statusFlags[i]))
             result.push_back(i);
     }
     return result;
@@ -206,7 +223,7 @@ GenTopResult TopGenMatching(
 
     // Find top and antitop (last copies)
     for (int i = 0; i < (int)pdgId.size(); ++i) {
-        if (!isLastCopy(statusFlags[i])) continue;
+        if (!isLastCopy_(statusFlags[i])) continue;
         if      (pdgId[i] ==  6 && result.top_idx     < 0) result.top_idx     = i;
         else if (pdgId[i] == -6 && result.antitop_idx < 0) result.antitop_idx = i;
     }
@@ -214,7 +231,7 @@ GenTopResult TopGenMatching(
 
     // b quarks: last-copy b (|pdgId|=5) that is a descendant of top/antitop
     for (int i = 0; i < (int)pdgId.size(); ++i) {
-        if (!isLastCopy(statusFlags[i])) continue;
+        if (!isLastCopy_(statusFlags[i])) continue;
         if (std::abs(pdgId[i]) != 5) continue;
         if      (result.b_from_top     < 0 && isDescendantOf(i, result.top_idx,     mothers))
             result.b_from_top = i;
@@ -226,7 +243,7 @@ GenTopResult TopGenMatching(
     int w_from_top     = -1;
     int w_from_antitop = -1;
     for (int i = 0; i < (int)pdgId.size(); ++i) {
-        if (!isLastCopy(statusFlags[i])) continue;
+        if (!isLastCopy_(statusFlags[i])) continue;
         if (std::abs(pdgId[i]) != 24) continue;
         if      (w_from_top     < 0 && isDescendantOf(i, result.top_idx,     mothers))
             w_from_top = i;
@@ -359,6 +376,111 @@ GenHHResult HHGenMatching(
     // else: e.g. tau_mu tau_mu or other modes — decayType stays 0
 
     return result;
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  GlobalDecayMode — unified decay classification for all MC samples
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Returns a single integer identifying the full decay chain (process + channel).
+// Calls ZGenMatching, TopGenMatching, HHGenMatching internally and maps
+// to a global numbering scheme:
+//
+//    0  = unknown / not classified
+//    1  = DY  Z→ee
+//    2  = DY  Z→μμ
+//    3  = DY  Z→τhτh
+//    4  = DY  Z→τμτh
+//    5  = DY  Z→τeτh
+//   10  = TT  fully hadronic
+//   11  = TT  semi-leptonic
+//   12  = TT  fully leptonic
+//   20  = HH  →bb τhτh
+//   21  = HH  →bb τμτh
+//   22  = HH  →bb τeτh
+//
+// Gap-based numbering leaves room for future processes (QCD=30, W+jets=40, ...).
+//
+// The Python-side LUT (DECAY_MODES dict in cutflow_TrigEff.py) maps these
+// integers to labels, colors, and process groups.
+//
+// Usage:
+//   df.Define("decayMode", "Ana::GlobalDecayMode(GenPart_pdgId, "
+//             "GenPart_genPartIdxMother, GenPart_statusFlags)")
+//
+int GlobalDecayMode(
+    const ROOT::RVec<int>& pdgId,
+    const ROOT::RVec<int>& mothers,
+    const ROOT::RVec<int>& statusFlags)
+{
+    // DY: Z boson decay modes 1-5
+    auto z = ZGenMatching(pdgId, mothers, statusFlags);
+    if (z.found() && z.decayMode > 0) return z.decayMode;
+
+    // TT: top decay topologies → 10-12
+    auto top = TopGenMatching(pdgId, mothers, statusFlags);
+    if (top.found() && top.decayMode > 0) return 9 + top.decayMode;
+
+    // Signal: HH→bbττ decay types → 20-22
+    auto hh = HHGenMatching(pdgId, mothers, statusFlags);
+    if (hh.found() && hh.decayType > 0) return 19 + hh.decayType;
+
+    return 0;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  NanoAOD type overloads
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// NanoAOD stores GenPart_genPartIdxMother as Short_t and GenPart_statusFlags
+// as UShort_t.  ROOT's JIT can silently convert these to RVec<int> in the
+// Define() call, but with ImplicitMT the temporary converted vectors cause
+// memory corruption ("double free").  These overloads accept the native types
+// and convert explicitly.
+
+namespace { // helper to avoid code duplication
+inline void _cvt(const ROOT::RVec<short>& s, const ROOT::RVec<unsigned short>& u,
+                  ROOT::RVec<int>& m, ROOT::RVec<int>& f) {
+    m.assign(s.begin(), s.end());
+    f.assign(u.begin(), u.end());
+}}
+
+GenZResult ZGenMatching(
+    const ROOT::RVec<int>& pdgId,
+    const ROOT::RVec<short>& mothers_s,
+    const ROOT::RVec<unsigned short>& flags_us)
+{
+    ROOT::RVec<int> m, f; _cvt(mothers_s, flags_us, m, f);
+    return ZGenMatching(pdgId, m, f);
+}
+
+GenTopResult TopGenMatching(
+    const ROOT::RVec<int>& pdgId,
+    const ROOT::RVec<short>& mothers_s,
+    const ROOT::RVec<unsigned short>& flags_us)
+{
+    ROOT::RVec<int> m, f; _cvt(mothers_s, flags_us, m, f);
+    return TopGenMatching(pdgId, m, f);
+}
+
+GenHHResult HHGenMatching(
+    const ROOT::RVec<int>& pdgId,
+    const ROOT::RVec<short>& mothers_s,
+    const ROOT::RVec<unsigned short>& flags_us,
+    float dr_threshold = 0.05f)
+{
+    ROOT::RVec<int> m, f; _cvt(mothers_s, flags_us, m, f);
+    return HHGenMatching(pdgId, m, f, dr_threshold);
+}
+
+int GlobalDecayMode(
+    const ROOT::RVec<int>& pdgId,
+    const ROOT::RVec<short>& mothers_s,
+    const ROOT::RVec<unsigned short>& flags_us)
+{
+    ROOT::RVec<int> m, f; _cvt(mothers_s, flags_us, m, f);
+    return GlobalDecayMode(pdgId, m, f);
 }
 
 } // namespace Ana

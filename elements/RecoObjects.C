@@ -28,6 +28,7 @@
 
 namespace Ana {
 
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  Muon selection  (ScoutingMuonVtx collection)
 // ═════════════════════════════════════════════════════════════════════════════
@@ -289,7 +290,10 @@ float WTransverseMass(
     float met_phi)
 {
     if (lepton_idx < 0 || lepton_idx >= (int)lep_pt.size()) return -1.f;
-    float dphi = (float)deltaPhi((double)lep_phi[lepton_idx], (double)met_phi);
+    double dp = (double)lep_phi[lepton_idx] - (double)met_phi;
+    while (dp >  M_PI) dp -= 2.0 * M_PI;
+    while (dp < -M_PI) dp += 2.0 * M_PI;
+    float dphi = (float)dp;
     return std::sqrt(2.f * lep_pt[lepton_idx] * met_pt * (1.f - std::cos(dphi)));
 }
 
@@ -368,6 +372,67 @@ ROOT::RVec<int> BvsAllSortIdx(
     std::sort(idx.begin(), idx.end(),
               [&scores](int a, int b) { return scores[a] > scores[b]; });
     return idx;
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Dijet mass-window pairing
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Finds the jet pair with invariant mass inside [mass_lo, mass_hi] that is
+// closest to `target`. Optionally excludes jet indices (e.g. jets already
+// used by the H→bb candidate when searching for H→ττ).
+//
+// Used for H→bb (mass window [100,150], target 125) and H→ττ (mass window
+// [40,150], target 80).
+//
+// Cut values come from config/regions.yaml via Python interpolation:
+//   reg = CUTS_REG["hbb"]
+//   df.Define("hbb_pair",
+//       f"Ana::findDijetInWindow(ScoutingPFJetRecluster_pt, "
+//       f"ScoutingPFJetRecluster_eta, ScoutingPFJetRecluster_phi, "
+//       f"ScoutingPFJetRecluster_mass, "
+//       f"{reg['mass_lo']}f, {reg['mass_hi']}f, {reg['target']}f)")
+//
+DijetPair findDijetInWindow(
+    const ROOT::RVec<float>& pt,
+    const ROOT::RVec<float>& eta,
+    const ROOT::RVec<float>& phi,
+    const ROOT::RVec<float>& mass,
+    float mass_lo, float mass_hi, float target,
+    const std::vector<int>& exclude = {})
+{
+    DijetPair best;
+    float bestDist = 1e9f;
+    int n = (int)pt.size();
+
+    for (int i = 0; i < n; ++i) {
+        bool skip_i = false;
+        for (int ex : exclude) { if (i == ex) { skip_i = true; break; } }
+        if (skip_i) continue;
+
+        for (int j = i + 1; j < n; ++j) {
+            bool skip_j = false;
+            for (int ex : exclude) { if (j == ex) { skip_j = true; break; } }
+            if (skip_j) continue;
+
+            TLorentzVector v1, v2;
+            v1.SetPtEtaPhiM(pt[i], eta[i], phi[i], mass[i]);
+            v2.SetPtEtaPhiM(pt[j], eta[j], phi[j], mass[j]);
+            float mjj = (float)(v1 + v2).M();
+
+            if (mjj >= mass_lo && mjj <= mass_hi) {
+                float dist = std::abs(mjj - target);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best.i1 = i;
+                    best.i2 = j;
+                    best.mass = mjj;
+                }
+            }
+        }
+    }
+    return best;
 }
 
 } // namespace Ana
