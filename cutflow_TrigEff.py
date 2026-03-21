@@ -492,33 +492,30 @@ def define_kinematics(df):
         .Define("nJets", "nScoutingPFJetRecluster")
         .Define("nLeptons", "nScoutingMuonVtx + nScoutingElectron")
     )
-    # -- AK8 fat jet kinematics + ScoutGlobalParT tagger (pT > 150 GeV) --
+    # -- AK8 fat jet kinematics + ScoutGlobalParT tagger + XvsQCD (pT > 150 GeV) --
     _AK8 = "ScoutingFatPFJetRecluster"
     _SGP = f"{_AK8}_scoutGlobalParT"
     _AK8_PT_MIN = 150.0
-    _has_ak8_0 = f"(n{_AK8}>=1 && {_AK8}_pt[0]>{_AK8_PT_MIN}f)"
-    _has_ak8_1 = f"(n{_AK8}>=2 && {_AK8}_pt[1]>{_AK8_PT_MIN}f)"
-    df = (df
-        .Define("nFatJets",  f"(int)Sum({_AK8}_pt > {_AK8_PT_MIN}f)")
-        .Define("ak8_pt0",   f"{_has_ak8_0} ? {_AK8}_pt[0] : -1.f")
-        .Define("ak8_eta0",  f"{_has_ak8_0} ? {_AK8}_eta[0] : -99.f")
-        .Define("ak8_mass0", f"{_has_ak8_0} ? {_AK8}_mass[0] : -1.f")
-        .Define("ak8_msd0",  f"{_has_ak8_0} ? {_AK8}_msoftdrop[0] : -1.f")
-        .Define("ak8_Xbb0",  f"{_has_ak8_0} ? {_SGP}_prob_Xbb[0] : -1.f")
-        .Define("ak8_Xtt0",  f"{_has_ak8_0} ? {_SGP}_prob_Xtauhtauh[0] : -1.f")
-        .Define("ak8_Xtm0",  f"{_has_ak8_0} ? {_SGP}_prob_Xtauhtaum[0] : -1.f")
-        .Define("ak8_Xte0",  f"{_has_ak8_0} ? {_SGP}_prob_Xtauhtaue[0] : -1.f")
-        .Define("ak8_QCD0",  f"{_has_ak8_0} ? {_SGP}_prob_QCD[0] : -1.f")
-        .Define("ak8_pt1",   f"{_has_ak8_1} ? {_AK8}_pt[1] : -1.f")
-        .Define("ak8_eta1",  f"{_has_ak8_1} ? {_AK8}_eta[1] : -99.f")
-        .Define("ak8_mass1", f"{_has_ak8_1} ? {_AK8}_mass[1] : -1.f")
-        .Define("ak8_msd1",  f"{_has_ak8_1} ? {_AK8}_msoftdrop[1] : -1.f")
-        .Define("ak8_Xbb1",  f"{_has_ak8_1} ? {_SGP}_prob_Xbb[1] : -1.f")
-        .Define("ak8_Xtt1",  f"{_has_ak8_1} ? {_SGP}_prob_Xtauhtauh[1] : -1.f")
-        .Define("ak8_Xtm1",  f"{_has_ak8_1} ? {_SGP}_prob_Xtauhtaum[1] : -1.f")
-        .Define("ak8_Xte1",  f"{_has_ak8_1} ? {_SGP}_prob_Xtauhtaue[1] : -1.f")
-        .Define("ak8_QCD1",  f"{_has_ak8_1} ? {_SGP}_prob_QCD[1] : -1.f")
-    )
+    df = df.Define("nFatJets", f"(int)Sum({_AK8}_pt > {_AK8_PT_MIN}f)")
+    for _i in range(3):
+        _has = f"(n{_AK8}>={_i+1} && {_AK8}_pt[{_i}]>{_AK8_PT_MIN}f)"
+        df = (df
+            .Define(f"ak8_pt{_i}",   f"{_has} ? {_AK8}_pt[{_i}] : -1.f")
+            .Define(f"ak8_eta{_i}",  f"{_has} ? {_AK8}_eta[{_i}] : -99.f")
+            .Define(f"ak8_mass{_i}", f"{_has} ? {_AK8}_mass[{_i}] : -1.f")
+            .Define(f"ak8_msd{_i}",  f"{_has} ? {_AK8}_msoftdrop[{_i}] : -1.f")
+            .Define(f"ak8_Xbb{_i}",  f"{_has} ? {_SGP}_prob_Xbb[{_i}] : -1.f")
+            .Define(f"ak8_Xtt{_i}",  f"{_has} ? {_SGP}_prob_Xtauhtauh[{_i}] : -1.f")
+            .Define(f"ak8_Xtm{_i}",  f"{_has} ? {_SGP}_prob_Xtauhtaum[{_i}] : -1.f")
+            .Define(f"ak8_Xte{_i}",  f"{_has} ? {_SGP}_prob_Xtauhtaue[{_i}] : -1.f")
+            .Define(f"ak8_QCD{_i}",  f"{_has} ? {_SGP}_prob_QCD[{_i}] : -1.f")
+            .Define(f"ak8_XbbVsQCD{_i}", f"{_has} ? (float)({_SGP}_prob_Xbb[{_i}] / ({_SGP}_prob_Xbb[{_i}] + {_SGP}_prob_QCD[{_i}])) : -1.f")
+            .Define(f"ak8_XttVsQCD{_i}", f"{_has} ? (float)({_SGP}_prob_Xtauhtauh[{_i}] / ({_SGP}_prob_Xtauhtauh[{_i}] + {_SGP}_prob_QCD[{_i}])) : -1.f")
+            .Define(f"ak8_XtmVsQCD{_i}", f"{_has} ? (float)({_SGP}_prob_Xtauhtaum[{_i}] / ({_SGP}_prob_Xtauhtaum[{_i}] + {_SGP}_prob_QCD[{_i}])) : -1.f")
+            .Define(f"ak8_XteVsQCD{_i}", f"{_has} ? (float)({_SGP}_prob_Xtauhtaue[{_i}] / ({_SGP}_prob_Xtauhtaue[{_i}] + {_SGP}_prob_QCD[{_i}])) : -1.f")
+            .Define(f"ak8_massCorr{_i}", f"{_has} ? (float)({_AK8}_mass[{_i}] * {_SGP}_massCorrGeneric[{_i}]) : -1.f")
+            .Define(f"ak8_massRes{_i}",  f"{_has} ? (float)({_AK8}_mass[{_i}] * {_SGP}_massCorrResonance[{_i}]) : -1.f")
+        )
     df = (df.Define("mjj_01",
                 "(float)(ROOT::Math::PtEtaPhiMVector("
                 "ScoutingPFJetRecluster_pt[0],ScoutingPFJetRecluster_eta[0],"
@@ -702,22 +699,27 @@ PLOT_VARS = [
     ("mbb_cand",     r"$m_{jj}^{H \to bb}$ candidate [GeV]",    25,   50,   200),
     ("mtautau_cand", r"$m_{jj}^{H \to \tau\tau}$ candidate [GeV]", 25, 0, 200),
     # -- AK8 fat jets (pT > 150 GeV; entries with -1 are filtered at booking) --
-    ("nFatJets",  r"Number of AK8 fat jets",                                      8,    0,     8),
-    ("ak8_pt0",   r"Leading AK8 $p_T$ [GeV]",                                   50,  150,  1000),
-    ("ak8_pt1",   r"Sub-leading AK8 $p_T$ [GeV]",                               50,  150,   800),
-    ("ak8_eta0",  r"Leading AK8 $\eta$",                                         30,   -5,     5),
-    ("ak8_eta1",  r"Sub-leading AK8 $\eta$",                                     30,   -5,     5),
-    ("ak8_mass0", r"Leading AK8 mass [GeV]",                                     40,    0,   400),
-    ("ak8_mass1", r"Sub-leading AK8 mass [GeV]",                                 40,    0,   400),
-    ("ak8_msd0",  r"Leading AK8 $m_{SD}$ [GeV]",                                40,    0,   300),
-    ("ak8_msd1",  r"Sub-leading AK8 $m_{SD}$ [GeV]",                            40,    0,   300),
-    ("ak8_Xbb0",  r"Leading AK8 ScoutGlobalParT $X_{bb}$",                      25,    0,     1),
-    ("ak8_Xbb1",  r"Sub-leading AK8 ScoutGlobalParT $X_{bb}$",                  25,    0,     1),
-    ("ak8_Xtt0",  r"Leading AK8 ScoutGlobalParT $X_{\tau_h\tau_h}$",            25,    0,     1),
-    ("ak8_Xtt1",  r"Sub-leading AK8 ScoutGlobalParT $X_{\tau_h\tau_h}$",        25,    0,     1),
-    ("ak8_Xtm0",  r"Leading AK8 ScoutGlobalParT $X_{\tau_\mu\tau_h}$",          25,    0,     1),
-    ("ak8_Xte0",  r"Leading AK8 ScoutGlobalParT $X_{\tau_e\tau_h}$",            25,    0,     1),
-    ("ak8_QCD0",  r"Leading AK8 ScoutGlobalParT QCD",                           25,    0,     1),
+    ("nFatJets",  r"Number of AK8 fat jets",  8, 0, 8),
+] + [
+    entry
+    for i, (lbl, pt_max) in enumerate([("Leading", 1000), ("Sub-leading", 800), ("Third", 600)])
+    for entry in [
+        (f"ak8_pt{i}",        rf"{lbl} AK8 $p_T$ [GeV]",                          50, 150, pt_max),
+        (f"ak8_eta{i}",       rf"{lbl} AK8 $\eta$",                                30,  -5,     5),
+        (f"ak8_mass{i}",      rf"{lbl} AK8 mass [GeV]",                            40,   0,   400),
+        (f"ak8_msd{i}",       rf"{lbl} AK8 $m_{{SD}}$ [GeV]",                      40,   0,   300),
+        (f"ak8_Xbb{i}",       rf"{lbl} AK8 $X_{{bb}}$",                            25,   0,     1),
+        (f"ak8_Xtt{i}",       rf"{lbl} AK8 $X_{{\tau_h\tau_h}}$",                  25,   0,     1),
+        (f"ak8_Xtm{i}",       rf"{lbl} AK8 $X_{{\tau_\mu\tau_h}}$",                25,   0,     1),
+        (f"ak8_Xte{i}",       rf"{lbl} AK8 $X_{{\tau_e\tau_h}}$",                  25,   0,     1),
+        (f"ak8_QCD{i}",       rf"{lbl} AK8 QCD",                                   25,   0,     1),
+        (f"ak8_XbbVsQCD{i}",  rf"{lbl} AK8 $X_{{bb}}$ vs QCD",                     25,   0,     1),
+        (f"ak8_XttVsQCD{i}",  rf"{lbl} AK8 $X_{{\tau_h\tau_h}}$ vs QCD",           25,   0,     1),
+        (f"ak8_XtmVsQCD{i}",  rf"{lbl} AK8 $X_{{\tau_\mu\tau_h}}$ vs QCD",         25,   0,     1),
+        (f"ak8_XteVsQCD{i}",  rf"{lbl} AK8 $X_{{\tau_e\tau_h}}$ vs QCD",           25,   0,     1),
+        (f"ak8_massCorr{i}",  rf"{lbl} AK8 regressed mass [GeV]",                  40,   0,   400),
+        (f"ak8_massRes{i}",   rf"{lbl} AK8 resonance mass [GeV]",                  40,   0,   400),
+    ]
 ]
 
 # ── Filter variables if --plot-vars given ──
