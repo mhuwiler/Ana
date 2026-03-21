@@ -70,6 +70,10 @@ parser.add_argument("--recache", action="store_true",
                     help="Force re-running event loops even if histogram cache exists")
 parser.add_argument("--plot-vars", nargs="+", default=None, metavar="PATTERN",
                     help="Only book/plot these variables (fnmatch patterns, e.g. 'ak4_pt*' HT)")
+parser.add_argument("--skim", action="store_true",
+                    help="Write slim ROOT files to /depot/ (keeps all events, drops unused branches)")
+parser.add_argument("--reslim", action="store_true",
+                    help="Force regeneration of slim files (e.g. after adding new branches)")
 ARGS = parser.parse_args()
 
 # ── Tee stdout/stderr to a timestamped log file ──
@@ -121,6 +125,7 @@ from utils.triggers import (
     DST_JetHT_expr,
     PARKING_HH_expr,
 )
+from utils.skim import run_skim, load_slim_or_eos
 from utils.plotting import (
     setup_style,
     cms_label,
@@ -418,14 +423,15 @@ mc = {}           # sample_name -> RDataFrame (with column "w")
 mc_dfs = {}       # raw DataFrames before weight definition
 sum_genw_ptrs = {}
 
+mc_files_map = {}  # sample_name -> list of EOS file paths (for skim)
 for group_name, samples_dict in group_files_by_sample.items():
     print(f"\n[{group_name}]")
     for sample_name, files in samples_dict.items():
         good_files = _limit_files(files, sample_name)
-        df = ROOT.RDataFrame("Events", good_files)
+        mc_files_map[sample_name] = good_files
+        df = load_slim_or_eos(sample_name, good_files)
         sum_genw_ptrs[sample_name] = df.Sum("genWeight")
         mc_dfs[sample_name] = df
-        print(f"  {sample_name[:60]:60s}  ({len(good_files)} files)")
 
 print("\nRunning sum(genWeight) for all samples in parallel...")
 ROOT.RDF.RunGraphs(list(sum_genw_ptrs.values()))
@@ -785,6 +791,14 @@ if not ARGS.recache:
         print(f"  LUMI = {LUMI:.4f} fb^-1, "
               f"{len(mc_hists_by_trig)} triggers, "
               f"{len(next(iter(mc_hists_by_trig.values())))} variables")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Skim — write slim ROOT files if requested (then exit)
+# ══════════════════════════════════════════════════════════════════════════════
+if ARGS.skim or ARGS.reslim:
+    run_skim(mc, mc_files_map, force=ARGS.reslim)
+    print("Skim complete. Re-run without --skim to use slim files.")
+    sys.exit(0)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Phases 1+2 — Book ALL actions, then run ONE event loop
