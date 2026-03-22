@@ -1,104 +1,188 @@
 """
 Snapshot/skim utilities for I/O optimization.
 
-Writes slim ROOT files with only the branches used by the analysis,
-eliminating the I/O bottleneck of reading 200+ branches over EOS.
-Slim files are stored on /depot/ for fast local access.
+Writes slim ROOT files with only the branches used by the analysis.
+Supports incremental branch addition via TTree::AddFriend — new branches
+are stored in a separate _friends.root file without rebuilding the main slim.
 
-Usage from cutflow_TrigEff.py:
-    from utils.skim import run_skim, load_slim_or_eos
+Usage:
+    # First skim (full):
+    python cutflow_TrigEff.py --skim --max-mc-files 2 --no-data
 
-    # Generate slim files (one-time):
-    python cutflow_TrigEff.py --skim --max-mc-files 10 --no-data
+    # After adding new Define() that uses a new branch:
+    python cutflow_TrigEff.py --reslim --max-mc-files 2 --no-data
+    # → only reads the NEW branch from EOS, adds to friends file
 
-    # Force regeneration after adding new branches:
-    python cutflow_TrigEff.py --reslim --max-mc-files 10 --no-data
+    # Full rebuild (merge friends into main):
+    python cutflow_TrigEff.py --reslim --force --max-mc-files 2 --no-data
 """
 
+import json
 import os
+import re
 import time
 
 import ROOT
 
 SLIM_DIR = "/depot/cms/users/das214/tmp/slim"
 
+# Collects all C++ expression strings from r_define/r_filter calls
+rdf_exprs = []
 
-def get_used_branches(df, original_file):
-    """Auto-detect tree branches actually used by the DataFrame chain.
 
-    Compares columns in the Define/Filter chain against the original
-    tree branches to find which file-level branches are referenced.
+# ── Expression tracking wrappers ─────────────────────────────────────────────
+
+def r_define(df, col, expr):
+    """Define a column and record the expression for branch auto-detection."""
+    rdf_exprs.append(expr)
+    return df.Define(col, expr)
+
+
+def r_filter(df, expr):
+    """Filter rows and record the expression for branch auto-detection."""
+    rdf_exprs.append(expr)
+    return df.Filter(expr)
+
+
+# ── Branch tracking (JSON sidecar files) ─────────────────────────────────────
+
+def _branches_file(sample_name):
+    return os.path.join(SLIM_DIR, f"{sample_name}.branches.json")
+
+
+def _load_known_branches(sample_name):
+    path = _branches_file(sample_name)
+    if os.path.exists(path):
+        with open(path) as f:
+            return set(json.load(f))
+    return set()
+
+
+def _save_known_branches(sample_name, branches):
+    with open(_branches_file(sample_name), "w") as f:
+        json.dump(sorted(branches), f, indent=2)
+
+
+# ── Auto-detection ───────────────────────────────────────────────────────────
+
+def detect_used_branches(expressions, tree_file):
+    """Auto-detect tree branches referenced in C++ expression strings.
+
+    Extracts all C-identifier tokens from the collected expressions,
+    then intersects with actual tree branch names.
     """
-    all_cols = set(str(c) for c in df.GetColumnNames())
-    df_raw = ROOT.RDataFrame("Events", original_file)
+    df_raw = ROOT.RDataFrame("Events", tree_file)
     tree_branches = set(str(c) for c in df_raw.GetColumnNames())
-    used = all_cols & tree_branches
-    for extra in ("run", "luminosityBlock", "genWeight"):
-        if extra in tree_branches:
-            used.add(extra)
+
+    all_exprs = " ".join(expressions)
+    tokens = set(re.findall(r'[A-Za-z_][A-Za-z0-9_]*', all_exprs))
+
+    used = tokens & tree_branches
+
+    for e in ("genWeight", "run", "luminosityBlock"):
+        if e in tree_branches:
+            used.add(e)
+
     return sorted(used)
 
 
-def run_skim(mc_dict, mc_files, force=False):
-    """Write slim ROOT files for all MC samples.
+# ── Skim (with incremental friend-tree support) ─────────────────────────────
+
+def run_skim(mc_dict, branches, mc_files_map=None, force=False):
+    """Write slim ROOT files using detected branch list.
+
+    On first run, writes all branches to slim/<sample>.root.
+    On subsequent runs (--reslim), only writes NEW branches to
+    slim/<sample>_friends.root via TTree::AddFriend pattern.
+    With force=True, does a full rebuild merging everything.
 
     Parameters
     ----------
     mc_dict : dict[str, RDataFrame]
-        Sample name -> RDataFrame with all Define/Filter chains applied.
-    mc_files : dict[str, list[str]]
-        Sample name -> list of original EOS file paths.
+        Sample name -> RDataFrame (with all Define/Filter chains).
+    branches : list[str]
+        All branch names needed by the analysis.
+    mc_files_map : dict[str, list[str]] or None
+        Sample name -> original EOS file paths (needed for incremental).
     force : bool
-        If True, overwrite existing slim files.
+        If True, full rebuild (overwrite existing slim files).
     """
     os.makedirs(SLIM_DIR, exist_ok=True)
     print(f"\n[skim] Output directory: {SLIM_DIR}")
-
-    first_name = next(iter(mc_dict))
-    branches = get_used_branches(mc_dict[first_name], mc_files[first_name][0])
-    mc_branches = [b for b in branches if b not in ("run", "luminosityBlock")]
-    print(f"[skim] Auto-detected {len(mc_branches)} branches")
+    print(f"[skim] Total needed: {len(branches)} branches")
 
     for name, df in mc_dict.items():
-        out = os.path.join(SLIM_DIR, f"{name}.root")
-        if os.path.exists(out) and not force:
-            sz = os.path.getsize(out) / 1e6
-            print(f"  {name:55s} exists ({sz:.1f} MB), skip")
+        slim_path = os.path.join(SLIM_DIR, f"{name}.root")
+        friends_path = os.path.join(SLIM_DIR, f"{name}_friends.root")
+        known = _load_known_branches(name)
+
+        if force or not os.path.exists(slim_path):
+            # Full skim
+            t0 = time.time()
+            df.Snapshot("Events", slim_path, branches)
+            sz = os.path.getsize(slim_path) / 1e6
+            print(f"  {name:55s} saved ({sz:.1f} MB, {time.time() - t0:.1f}s)")
+            _save_known_branches(name, branches)
+            if os.path.exists(friends_path):
+                os.remove(friends_path)
             continue
+
+        # Incremental: find new branches
+        new_branches = sorted(set(branches) - known)
+        if not new_branches:
+            sz = os.path.getsize(slim_path) / 1e6
+            print(f"  {name:55s} up to date ({sz:.1f} MB)")
+            continue
+
+        print(f"  {name:55s} adding {len(new_branches)} new branches:")
+        for b in new_branches:
+            print(f"    + {b}")
+
+        if mc_files_map and name in mc_files_map:
+            eos_df = ROOT.RDataFrame("Events", mc_files_map[name])
+        else:
+            print(f"    ERROR: no EOS files for {name}, use --force for full rebuild")
+            continue
+
         t0 = time.time()
-        df.Snapshot("Events", out, mc_branches)
-        sz = os.path.getsize(out) / 1e6
-        print(f"  {name:55s} saved ({sz:.1f} MB, {time.time() - t0:.1f}s)")
+        eos_df.Snapshot("Events", friends_path, new_branches)
+        sz = os.path.getsize(friends_path) / 1e6
+        print(f"    friends saved ({sz:.1f} MB, {time.time() - t0:.1f}s)")
+        _save_known_branches(name, known | set(new_branches))
 
     total = sum(
         os.path.getsize(os.path.join(SLIM_DIR, f)) / 1e6
         for f in os.listdir(SLIM_DIR)
         if f.endswith(".root")
     )
-    print(f"\n[skim] Total: {total:.0f} MB in {SLIM_DIR}")
+    print(f"\n[skim] Total disk: {total:.0f} MB in {SLIM_DIR}")
 
+
+# ── Loading (slim + friends, or fallback to EOS) ────────────────────────────
 
 def load_slim_or_eos(name, eos_files, max_files=None):
     """Return RDataFrame from slim file if available, else from EOS.
 
-    Parameters
-    ----------
-    name : str
-        Sample name (used as slim filename).
-    eos_files : list[str]
-        Original EOS file paths.
-    max_files : int or None
-        Limit number of EOS files (ignored when slim exists).
-
-    Returns
-    -------
-    ROOT.RDataFrame
+    If a _friends.root file exists, it is attached via AddFriend
+    so all branches (original + incremental) are available.
     """
     slim = os.path.join(SLIM_DIR, f"{name}.root")
+    friends = os.path.join(SLIM_DIR, f"{name}_friends.root")
+
     if os.path.exists(slim):
         sz = os.path.getsize(slim) / 1e6
-        print(f"  {name:55s} (slim, {sz:.1f} MB)")
-        return ROOT.RDataFrame("Events", slim)
+        chain = ROOT.TChain("Events")
+        chain.Add(slim)
+        if os.path.exists(friends):
+            fsz = os.path.getsize(friends) / 1e6
+            friend_chain = ROOT.TChain("Events")
+            friend_chain.Add(friends)
+            chain.AddFriend(friend_chain)
+            print(f"  {name:55s} (slim {sz:.1f}MB + friends {fsz:.1f}MB)")
+        else:
+            print(f"  {name:55s} (slim, {sz:.1f} MB)")
+        return ROOT.RDataFrame(chain)
+
     files = eos_files[:max_files] if max_files else eos_files
     print(f"  {name:55s} ({len(files)} files)")
     return ROOT.RDataFrame("Events", files)

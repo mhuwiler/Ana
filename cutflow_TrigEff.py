@@ -40,6 +40,7 @@ import sys
 import argparse
 import fnmatch
 import hashlib
+import yaml
 import math
 import time
 import resource
@@ -73,7 +74,9 @@ parser.add_argument("--plot-vars", nargs="+", default=None, metavar="PATTERN",
 parser.add_argument("--skim", action="store_true",
                     help="Write slim ROOT files to /depot/ (keeps all events, drops unused branches)")
 parser.add_argument("--reslim", action="store_true",
-                    help="Force regeneration of slim files (e.g. after adding new branches)")
+                    help="Incrementally add new branches to slim files (or full rebuild with --force)")
+parser.add_argument("--force", action="store_true",
+                    help="With --reslim: full rebuild instead of incremental friend-tree update")
 ARGS = parser.parse_args()
 
 # ── Tee stdout/stderr to a timestamped log file ──
@@ -125,7 +128,7 @@ from utils.triggers import (
     DST_JetHT_expr,
     PARKING_HH_expr,
 )
-from utils.skim import run_skim, load_slim_or_eos
+from utils.skim import r_define, r_filter, rdf_exprs, detect_used_branches, run_skim, load_slim_or_eos
 from utils.plotting import (
     setup_style,
     cms_label,
@@ -134,6 +137,7 @@ from utils.plotting import (
     plot_stacked_with_efficiency,
     plot_stacked_with_significance,
     plot_trigger_shape_overlay,
+    plot_2d_hist,
     th1_to_np,
 )
 
@@ -155,6 +159,7 @@ _INVALIDATION_FILES = [
     "config/objects.yaml",
     "config/acceptance.yaml",
     "config/regions.yaml",
+    "config/cuts.yaml",
 ]
 
 
@@ -442,12 +447,14 @@ for sample_name, df in mc_dfs.items():
     scale_nolumi = xsec_pb * 1000.0 / sum_genw  # LUMI applied post-hoc
     print(f"  {sample_name[:60]:60s}  xsec={xsec_pb:.4g} pb  "
           f"sum_genw={sum_genw:.4g}  scale(no L)={scale_nolumi:.4e}")
-    mc[sample_name] = df.Define("w", f"genWeight * {scale_nolumi:.10e}")
+    w_expr = f"genWeight * {scale_nolumi:.10e}"
+    rdf_exprs.append(w_expr)
+    mc[sample_name] = df.Define("w", w_expr)
 
-# Convenience: lists of sample names per group
-dy_samples  = list(group_files_by_sample["DY"].keys())
-tt_samples  = list(group_files_by_sample["TT"].keys())
-sig_samples = list(group_files_by_sample["HHbbtt"].keys())
+# Convenience: lists of sample names per group (empty if group not in config)
+dy_samples  = list(group_files_by_sample.get("DY", {}).keys())
+tt_samples  = list(group_files_by_sample.get("TT", {}).keys())
+sig_samples = list(group_files_by_sample.get("HHbbtt", {}).keys())
 qcd_samples = list(group_files_by_sample.get("QCD", {}).keys())
 
 
@@ -464,6 +471,17 @@ gen_hh_expr     = f"Ana::HHGenMatching({_GP}_pdgId, {_GP}_genPartIdxMother, {_GP
 for name in mc:
     mc[name] = mc[name].Define("decayMode", decay_mode_expr)
 
+_AK8_GM = "ScoutingFatPFJetRecluster"
+_SGP_GM = f"{_AK8_GM}_scoutGlobalParT"
+_GM_PROB_NAMES = ["Xbb", "Xbc", "Xbs", "Xcc", "Xcs", "Xss", "Xud", "Xgg", "Xqq",
+                  "Xtauhtauh", "Xtauhtaum", "Xtauhtaue", "QCD"]
+
+def _vs_all_at(idx_var, prob_name):
+    """Build XvsAll expression at a specific jet index."""
+    num = f"{_SGP_GM}_prob_{prob_name}[{idx_var}]"
+    denom = " + ".join(f"{_SGP_GM}_prob_{p}[{idx_var}]" for p in _GM_PROB_NAMES)
+    return f"(float)({num} / ({denom}))"
+
 for name in sig_samples:
     mc[name] = (mc[name]
         .Define("gen_HH",           gen_hh_expr)
@@ -477,11 +495,53 @@ for name in sig_samples:
         .Define("gen_eta_Hbb",      "genHbb_p4.Eta()")
         .Define("gen_eta_Htautau",  "genHtautau_p4.Eta()")
     )
+    # -- Gen-match AK8 jets to gen H→bb and H→ττ --
+    mc[name] = (mc[name]
+        # ΔR of each AK8 jet to gen H→bb
+        .Define("ak8_dR_to_genHbb",
+                f"ROOT::VecOps::DeltaR("
+                f"{_AK8_GM}_eta, ROOT::RVecF(n{_AK8_GM}, (float)genHbb_p4.Eta()), "
+                f"{_AK8_GM}_phi, ROOT::RVecF(n{_AK8_GM}, (float)genHbb_p4.Phi()))")
+        .Define("ak8_genHbb_match_idx",
+                f"n{_AK8_GM} > 0 && genHbb_p4.Pt() > 0 ? "
+                f"(Min(ak8_dR_to_genHbb) < 0.8f ? (int)ArgMin(ak8_dR_to_genHbb) : -1) : -1")
+        .Define("ak8_genHbb_match_dR",
+                "ak8_genHbb_match_idx >= 0 ? (float)ak8_dR_to_genHbb[ak8_genHbb_match_idx] : -1.f")
+        .Define("ak8_genHbb_match_Xbb",
+                f"ak8_genHbb_match_idx >= 0 ? {_SGP_GM}_prob_Xbb[ak8_genHbb_match_idx] : -1.f")
+        .Define("ak8_genHbb_match_XbbVsAll",
+                f"ak8_genHbb_match_idx >= 0 ? {_vs_all_at('ak8_genHbb_match_idx', 'Xbb')} : -1.f")
+        # ΔR of each AK8 jet to gen H→ττ
+        .Define("ak8_dR_to_genHtt",
+                f"ROOT::VecOps::DeltaR("
+                f"{_AK8_GM}_eta, ROOT::RVecF(n{_AK8_GM}, (float)genHtautau_p4.Eta()), "
+                f"{_AK8_GM}_phi, ROOT::RVecF(n{_AK8_GM}, (float)genHtautau_p4.Phi()))")
+        .Define("ak8_genHtt_match_idx",
+                f"n{_AK8_GM} > 0 && genHtautau_p4.Pt() > 0 ? "
+                f"(Min(ak8_dR_to_genHtt) < 0.8f ? (int)ArgMin(ak8_dR_to_genHtt) : -1) : -1")
+        .Define("ak8_genHtt_match_dR",
+                "ak8_genHtt_match_idx >= 0 ? (float)ak8_dR_to_genHtt[ak8_genHtt_match_idx] : -1.f")
+        .Define("ak8_genHtt_match_Xtt",
+                f"ak8_genHtt_match_idx >= 0 ? {_SGP_GM}_prob_Xtauhtauh[ak8_genHtt_match_idx] : -1.f")
+        .Define("ak8_genHtt_match_XttVsAll",
+                f"ak8_genHtt_match_idx >= 0 ? {_vs_all_at('ak8_genHtt_match_idx', 'Xtauhtauh')} : -1.f")
+    )
+
+# Dummy gen-match columns for non-signal samples (AK8 only here; AK4 added after define_kinematics)
+_gen_match_cols_ak8 = ["ak8_genHbb_match_dR", "ak8_genHbb_match_Xbb",
+                       "ak8_genHbb_match_XbbVsAll", "ak8_genHtt_match_dR",
+                       "ak8_genHtt_match_Xtt", "ak8_genHtt_match_XttVsAll"]
+for name in mc:
+    if name not in sig_samples:
+        for col in _gen_match_cols_ak8:
+            mc[name] = mc[name].Define(col, "-1.f")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Kinematic definitions
 # ──────────────────────────────────────────────────────────────────────────────
+
+_AK4 = "ScoutingPFJetRecluster2"
 
 def define_kinematics(df):
     """Define derived kinematic columns for jets.
@@ -490,12 +550,12 @@ def define_kinematics(df):
     and prevent stack overflows with large TChains.
     """
     df = (df
-        .Define("ak4_pt0", "ScoutingPFJetRecluster_pt[0]") # Check this (Could be a bug in the processing)
-        .Define("ak4_pt1", "ScoutingPFJetRecluster_pt[1]")
-        .Define("ak4_pt2", "ScoutingPFJetRecluster_pt[2]")
-        .Define("ak4_pt3", "ScoutingPFJetRecluster_pt[3]")
-        .Define("HT",  "Sum(ScoutingPFJetRecluster_pt)")
-        .Define("nJets", "nScoutingPFJetRecluster")
+        .Define("ak4_pt0", "ScoutingPFJetRecluster2_pt[0]") # Check this (Could be a bug in the processing)
+        .Define("ak4_pt1", "ScoutingPFJetRecluster2_pt[1]")
+        .Define("ak4_pt2", "ScoutingPFJetRecluster2_pt[2]")
+        .Define("ak4_pt3", "ScoutingPFJetRecluster2_pt[3]")
+        .Define("HT",  "Sum(ScoutingPFJetRecluster2_pt)")
+        .Define("nJets", "nScoutingPFJetRecluster2")
         .Define("nLeptons", "nScoutingMuonVtx + nScoutingElectron")
     )
     # -- AK8 fat jet kinematics + ScoutGlobalParT tagger + XvsQCD (pT > 150 GeV) --
@@ -522,63 +582,105 @@ def define_kinematics(df):
             .Define(f"ak8_massCorr{_i}", f"{_has} ? (float)({_AK8}_mass[{_i}] * {_SGP}_massCorrGeneric[{_i}]) : -1.f")
             .Define(f"ak8_massRes{_i}",  f"{_has} ? (float)({_AK8}_mass[{_i}] * {_SGP}_massCorrResonance[{_i}]) : -1.f")
         )
+    # -- AK8 tagger-based candidates (best XvsAll score per hypothesis) --
+    _pt_cut = f"{_AK8}_pt > {_AK8_PT_MIN}f"
+    # Denominator: sum of ALL ScoutGlobalParT probabilities
+    _all_probs = " + ".join(f"{_SGP}_prob_{p}" for p in [
+        "Xbb", "Xbc", "Xbs", "Xcc", "Xcs", "Xss", "Xud", "Xgg", "Xqq",
+        "Xtauhtauh", "Xtauhtaum", "Xtauhtaue", "QCD",
+    ])
+    _cand_scores = {
+        "Hbb": f"{_SGP}_prob_Xbb / ({_all_probs})",
+        "Htt": f"{_SGP}_prob_Xtauhtauh / ({_all_probs})",
+        "Htm": f"{_SGP}_prob_Xtauhtaum / ({_all_probs})",
+        "Hte": f"{_SGP}_prob_Xtauhtaue / ({_all_probs})",
+    }
+    for _cand, _score_expr in _cand_scores.items():
+        _masked = (f"ROOT::VecOps::Where({_pt_cut}, "
+                   f"(ROOT::RVecF)({_score_expr}), "
+                   f"ROOT::RVecF(n{_AK8}, -1.f))")
+        df = (df
+            .Define(f"ak8_{_cand}_idx",   f"nFatJets > 0 ? (int)ArgMax({_masked}) : -1")
+            .Define(f"ak8_{_cand}_score", f"ak8_{_cand}_idx >= 0 ? ({_masked})[ak8_{_cand}_idx] : -1.f")
+            .Define(f"ak8_{_cand}_pt",    f"ak8_{_cand}_idx >= 0 ? {_AK8}_pt[ak8_{_cand}_idx] : -1.f")
+            .Define(f"ak8_{_cand}_eta",   f"ak8_{_cand}_idx >= 0 ? {_AK8}_eta[ak8_{_cand}_idx] : -99.f")
+            .Define(f"ak8_{_cand}_mass",  f"ak8_{_cand}_idx >= 0 ? {_AK8}_mass[ak8_{_cand}_idx] : -1.f")
+            .Define(f"ak8_{_cand}_msd",   f"ak8_{_cand}_idx >= 0 ? {_AK8}_msoftdrop[ak8_{_cand}_idx] : -1.f")
+            .Define(f"ak8_{_cand}_phi",   f"ak8_{_cand}_idx >= 0 ? {_AK8}_phi[ak8_{_cand}_idx] : -99.f")
+        )
+    # -- ΔR between Hbb and Htt candidates --
+    df = df.Define("ak8_dR_Hbb_Htt",
+                   "(ak8_Hbb_idx >= 0 && ak8_Htt_idx >= 0) ? "
+                   "ROOT::VecOps::DeltaR(ak8_Hbb_eta, ak8_Htt_eta, ak8_Hbb_phi, ak8_Htt_phi) : -1.f")
     df = (df.Define("mjj_01",
                 "(float)(ROOT::Math::PtEtaPhiMVector("
-                "ScoutingPFJetRecluster_pt[0],ScoutingPFJetRecluster_eta[0],"
-                "ScoutingPFJetRecluster_phi[0],ScoutingPFJetRecluster_mass[0])"
+                "ScoutingPFJetRecluster2_pt[0],ScoutingPFJetRecluster2_eta[0],"
+                "ScoutingPFJetRecluster2_phi[0],ScoutingPFJetRecluster2_mass[0])"
                 " + ROOT::Math::PtEtaPhiMVector("
-                "ScoutingPFJetRecluster_pt[1],ScoutingPFJetRecluster_eta[1],"
-                "ScoutingPFJetRecluster_phi[1],ScoutingPFJetRecluster_mass[1])).M()")
+                "ScoutingPFJetRecluster2_pt[1],ScoutingPFJetRecluster2_eta[1],"
+                "ScoutingPFJetRecluster2_phi[1],ScoutingPFJetRecluster2_mass[1])).M()")
         .Define("dR_01",
                 "ROOT::VecOps::DeltaR("
-                "ScoutingPFJetRecluster_eta[0],ScoutingPFJetRecluster_eta[1],"
-                "ScoutingPFJetRecluster_phi[0],ScoutingPFJetRecluster_phi[1])")
+                "ScoutingPFJetRecluster2_eta[0],ScoutingPFJetRecluster2_eta[1],"
+                "ScoutingPFJetRecluster2_phi[0],ScoutingPFJetRecluster2_phi[1])")
         .Define("MHT",
                 "(float)sqrt("
-                "pow(Sum(ScoutingPFJetRecluster_pt*cos(ScoutingPFJetRecluster_phi)),2) + "
-                "pow(Sum(ScoutingPFJetRecluster_pt*sin(ScoutingPFJetRecluster_phi)),2))")
+                "pow(Sum(ScoutingPFJetRecluster2_pt*cos(ScoutingPFJetRecluster2_phi)),2) + "
+                "pow(Sum(ScoutingPFJetRecluster2_pt*sin(ScoutingPFJetRecluster2_phi)),2))")
         .Define("m4j",
                 "(float)(ROOT::Math::PtEtaPhiMVector("
-                "ScoutingPFJetRecluster_pt[0],ScoutingPFJetRecluster_eta[0],"
-                "ScoutingPFJetRecluster_phi[0],ScoutingPFJetRecluster_mass[0])"
+                "ScoutingPFJetRecluster2_pt[0],ScoutingPFJetRecluster2_eta[0],"
+                "ScoutingPFJetRecluster2_phi[0],ScoutingPFJetRecluster2_mass[0])"
                 " + ROOT::Math::PtEtaPhiMVector("
-                "ScoutingPFJetRecluster_pt[1],ScoutingPFJetRecluster_eta[1],"
-                "ScoutingPFJetRecluster_phi[1],ScoutingPFJetRecluster_mass[1])"
+                "ScoutingPFJetRecluster2_pt[1],ScoutingPFJetRecluster2_eta[1],"
+                "ScoutingPFJetRecluster2_phi[1],ScoutingPFJetRecluster2_mass[1])"
                 " + ROOT::Math::PtEtaPhiMVector("
-                "ScoutingPFJetRecluster_pt[2],ScoutingPFJetRecluster_eta[2],"
-                "ScoutingPFJetRecluster_phi[2],ScoutingPFJetRecluster_mass[2])"
+                "ScoutingPFJetRecluster2_pt[2],ScoutingPFJetRecluster2_eta[2],"
+                "ScoutingPFJetRecluster2_phi[2],ScoutingPFJetRecluster2_mass[2])"
                 " + ROOT::Math::PtEtaPhiMVector("
-                "ScoutingPFJetRecluster_pt[3],ScoutingPFJetRecluster_eta[3],"
-                "ScoutingPFJetRecluster_phi[3],ScoutingPFJetRecluster_mass[3])).M()")
+                "ScoutingPFJetRecluster2_pt[3],ScoutingPFJetRecluster2_eta[3],"
+                "ScoutingPFJetRecluster2_phi[3],ScoutingPFJetRecluster2_mass[3])).M()")
     )
     # b-jet selection: ParticleNet discriminators (prob_bb is for AK8 fat jets, not AK4)
-    # pnet_b_raw  = raw prob_b score per jet
-    # pnet_BvsAll = prob_b / (prob_b + prob_c + prob_cc + prob_g + prob_uds + prob_undef)
+    # upart_b_raw  = raw UParT probb score per jet
+    # ak4_BvsAll   = probb / (probb + probc + probg + probuds + problepb + probtaum + probtaup)
     # Sort jets by BvsAll in descending order; [0] = highest, [1] = second-highest
     df = (df
-        .Define("pnet_b_raw", "ScoutingPFJetRecluster_particleNet_prob_b")
-        .Define("pnet_BvsAll",
-                "ScoutingPFJetRecluster_particleNet_prob_b"
-                " / (ScoutingPFJetRecluster_particleNet_prob_b"
-                " + ScoutingPFJetRecluster_particleNet_prob_c + ScoutingPFJetRecluster_particleNet_prob_cc"
-                " + ScoutingPFJetRecluster_particleNet_prob_g + ScoutingPFJetRecluster_particleNet_prob_uds"
-                " + ScoutingPFJetRecluster_particleNet_prob_undef)")
+        .Define("upart_b_raw", f"{_AK4}_scoutUParT_probb")
+        .Define("ak4_BvsAll",
+                f"{_AK4}_scoutUParT_probb"
+                f" / ({_AK4}_scoutUParT_probb"
+                f" + {_AK4}_scoutUParT_probc + {_AK4}_scoutUParT_probg"
+                f" + {_AK4}_scoutUParT_probuds + {_AK4}_scoutUParT_problepb"
+                f" + {_AK4}_scoutUParT_probtaum + {_AK4}_scoutUParT_probtaup)")
+        .Define("ak4_TaupVsAll",
+                f"{_AK4}_scoutUParT_probtaup"
+                f" / ({_AK4}_scoutUParT_probb"
+                f" + {_AK4}_scoutUParT_probc + {_AK4}_scoutUParT_probg"
+                f" + {_AK4}_scoutUParT_probuds + {_AK4}_scoutUParT_problepb"
+                f" + {_AK4}_scoutUParT_probtaum + {_AK4}_scoutUParT_probtaup)")
+        .Define("ak4_TaumVsAll",
+                f"{_AK4}_scoutUParT_probtaum"
+                f" / ({_AK4}_scoutUParT_probb"
+                f" + {_AK4}_scoutUParT_probc + {_AK4}_scoutUParT_probg"
+                f" + {_AK4}_scoutUParT_probuds + {_AK4}_scoutUParT_problepb"
+                f" + {_AK4}_scoutUParT_probtaum + {_AK4}_scoutUParT_probtaup)")
         .Define("bsort_idx",
-                "ROOT::VecOps::Reverse(ROOT::VecOps::Argsort(pnet_BvsAll))")
+                "ROOT::VecOps::Reverse(ROOT::VecOps::Argsort(ak4_BvsAll))")
         .Define("b0_idx", "(int)bsort_idx[0]")
         .Define("b1_idx", "(int)bsort_idx[1]")
-        .Define("b0_pt",    "ScoutingPFJetRecluster_pt[b0_idx]")
-        .Define("b0_eta",   "ScoutingPFJetRecluster_eta[b0_idx]")
-        .Define("b0_phi",   "ScoutingPFJetRecluster_phi[b0_idx]")
-        .Define("b0_mass",  "ScoutingPFJetRecluster_mass[b0_idx]")
-        .Define("b0_score", "pnet_BvsAll[b0_idx]")
-        .Define("b1_pt",    "ScoutingPFJetRecluster_pt[b1_idx]")
-        .Define("b1_eta",   "ScoutingPFJetRecluster_eta[b1_idx]")
-        .Define("b1_phi",   "ScoutingPFJetRecluster_phi[b1_idx]")
-        .Define("b1_mass",  "ScoutingPFJetRecluster_mass[b1_idx]")
-        .Define("b1_score", "pnet_BvsAll[b1_idx]")
-        .Define("b0_raw",   "pnet_b_raw[b0_idx]")
-        .Define("b1_raw",   "pnet_b_raw[b1_idx]")
+        .Define("b0_pt",    "ScoutingPFJetRecluster2_pt[b0_idx]")
+        .Define("b0_eta",   "ScoutingPFJetRecluster2_eta[b0_idx]")
+        .Define("b0_phi",   "ScoutingPFJetRecluster2_phi[b0_idx]")
+        .Define("b0_mass",  "ScoutingPFJetRecluster2_mass[b0_idx]")
+        .Define("b0_score", "ak4_BvsAll[b0_idx]")
+        .Define("b1_pt",    "ScoutingPFJetRecluster2_pt[b1_idx]")
+        .Define("b1_eta",   "ScoutingPFJetRecluster2_eta[b1_idx]")
+        .Define("b1_phi",   "ScoutingPFJetRecluster2_phi[b1_idx]")
+        .Define("b1_mass",  "ScoutingPFJetRecluster2_mass[b1_idx]")
+        .Define("b1_score", "ak4_BvsAll[b1_idx]")
+        .Define("b0_raw",   "upart_b_raw[b0_idx]")
+        .Define("b1_raw",   "upart_b_raw[b1_idx]")
         .Define("mbb",
                 "(float)(ROOT::Math::PtEtaPhiMVector(b0_pt,b0_eta,b0_phi,b0_mass)"
                 " + ROOT::Math::PtEtaPhiMVector(b1_pt,b1_eta,b1_phi,b1_mass)).M()")
@@ -589,34 +691,34 @@ def define_kinematics(df):
                 " + ROOT::Math::PtEtaPhiMVector(b1_pt,b1_eta,b1_phi,b1_mass)).Pt()")
     )
     df = (df
-        .Define("ak4_eta0", "ScoutingPFJetRecluster_eta[0]")
-        .Define("ak4_eta1", "ScoutingPFJetRecluster_eta[1]")
-        .Define("ak4_eta2", "ScoutingPFJetRecluster_eta[2]")
-        .Define("ak4_eta3", "ScoutingPFJetRecluster_eta[3]")
-        .Define("ak4_mass0", "ScoutingPFJetRecluster_mass[0]")
-        .Define("ak4_mass1", "ScoutingPFJetRecluster_mass[1]")
+        .Define("ak4_eta0", "ScoutingPFJetRecluster2_eta[0]")
+        .Define("ak4_eta1", "ScoutingPFJetRecluster2_eta[1]")
+        .Define("ak4_eta2", "ScoutingPFJetRecluster2_eta[2]")
+        .Define("ak4_eta3", "ScoutingPFJetRecluster2_eta[3]")
+        .Define("ak4_mass0", "ScoutingPFJetRecluster2_mass[0]")
+        .Define("ak4_mass1", "ScoutingPFJetRecluster2_mass[1]")
         .Define("nMuons", "nScoutingMuonVtx")
         .Define("nElectrons", "nScoutingElectron")
         .Define("centrality",
-                "(float)(Sum(ScoutingPFJetRecluster_pt) / "
-                "Sum(ScoutingPFJetRecluster_pt * cosh(ScoutingPFJetRecluster_eta)))")
+                "(float)(Sum(ScoutingPFJetRecluster2_pt) / "
+                "Sum(ScoutingPFJetRecluster2_pt * cosh(ScoutingPFJetRecluster2_eta)))")
         .Define("dEta_01",
-                "(float)abs(ScoutingPFJetRecluster_eta[0] - ScoutingPFJetRecluster_eta[1])")
+                "(float)abs(ScoutingPFJetRecluster2_eta[0] - ScoutingPFJetRecluster2_eta[1])")
     )
     # H→bb candidate: best dijet pair with m_jj ∈ [100, 150] GeV (closest to 125)
     df = (df
         .Define("hbb_pair",
                 "Ana::findDijetInWindow("
-                "ScoutingPFJetRecluster_pt, ScoutingPFJetRecluster_eta,"
-                "ScoutingPFJetRecluster_phi, ScoutingPFJetRecluster_mass,"
+                "ScoutingPFJetRecluster2_pt, ScoutingPFJetRecluster2_eta,"
+                "ScoutingPFJetRecluster2_phi, ScoutingPFJetRecluster2_mass,"
                 "100.f, 150.f, 125.f)")
         .Define("has_hbb",      "hbb_pair.i1 >= 0")
         .Define("mbb_cand",     "hbb_pair.mass")
         # H→ττ candidate: best dijet pair from remaining jets, m_jj ∈ [40, 150] GeV
         .Define("htautau_pair",
                 "Ana::findDijetInWindow("
-                "ScoutingPFJetRecluster_pt, ScoutingPFJetRecluster_eta,"
-                "ScoutingPFJetRecluster_phi, ScoutingPFJetRecluster_mass,"
+                "ScoutingPFJetRecluster2_pt, ScoutingPFJetRecluster2_eta,"
+                "ScoutingPFJetRecluster2_phi, ScoutingPFJetRecluster2_mass,"
                 "40.f, 150.f, 80.f, {hbb_pair.i1, hbb_pair.i2})")
         .Define("has_htautau",  "htautau_pair.i1 >= 0")
         .Define("mtautau_cand", "htautau_pair.mass")
@@ -627,6 +729,64 @@ if data_df is not None:
     data_df = define_kinematics(data_df)
 for name in mc:
     mc[name] = define_kinematics(mc[name])
+
+# ── Gen-matched AK4 jets (signal only, after define_kinematics for ak4_BvsAll/TaupVsAll) ──
+_AK4_GM = "ScoutingPFJetRecluster2"
+_ak4_gen_particles = [
+    ("b1",   "gen_HH.b1",   "BvsAll"),
+    ("b2",   "gen_HH.b2",   "BvsAll"),
+    ("tau1", "gen_HH.tau1", "TaupVsAll"),
+    ("tau2", "gen_HH.tau2", "TaupVsAll"),
+]
+_ak4_gen_cols = []
+for _gp_label, _gp_expr, _score_name in _ak4_gen_particles:
+    _ak4_gen_cols.extend([
+        f"ak4_gen{_gp_label}_dR",
+        f"ak4_gen{_gp_label}_{_score_name}",
+    ])
+
+for name in sig_samples:
+    for _gp_label, _gp_expr, _score_name in _ak4_gen_particles:
+        _p4 = f"gen_{_gp_label}_p4"
+        _dR_vec = f"ak4_dR_to_gen{_gp_label}"
+        _idx = f"ak4_gen{_gp_label}_idx"
+        mc[name] = (mc[name]
+            .Define(_p4, f"Ana::getP4((int){_gp_expr}, GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass)")
+            .Define(_dR_vec,
+                    f"ROOT::VecOps::DeltaR("
+                    f"{_AK4_GM}_eta, ROOT::RVecF(n{_AK4_GM}, (float){_p4}.Eta()), "
+                    f"{_AK4_GM}_phi, ROOT::RVecF(n{_AK4_GM}, (float){_p4}.Phi()))")
+            .Define(_idx,
+                    f"n{_AK4_GM} > 0 && {_p4}.Pt() > 0 ? "
+                    f"(int)(Min({_dR_vec}) < 0.4f ? ArgMin({_dR_vec}) : -1) : -1")
+            .Define(f"ak4_gen{_gp_label}_dR",
+                    f"{_idx} >= 0 ? {_dR_vec}[{_idx}] : -1.f")
+            .Define(f"ak4_gen{_gp_label}_{_score_name}",
+                    f"{_idx} >= 0 ? ak4_{_score_name}[{_idx}] : -1.f")
+        )
+
+# Dummy AK4 gen-match columns for non-signal samples
+for name in mc:
+    if name not in sig_samples:
+        for col in _ak4_gen_cols:
+            mc[name] = mc[name].Define(col, "-1.f")
+
+# ── Load and apply user cuts from config/cuts.yaml ──
+_cuts_cfg = os.path.join(ANA_DIR, "config", "cuts.yaml")
+USER_CUTS = []
+if os.path.exists(_cuts_cfg):
+    with open(_cuts_cfg) as _f:
+        _cuts_data = yaml.safe_load(_f) or {}
+    USER_CUTS = _cuts_data.get("cuts", []) or []
+
+if USER_CUTS:
+    print(f"\n[cuts] Applying {len(USER_CUTS)} user cuts from config/cuts.yaml:")
+    for _cut in USER_CUTS:
+        print(f"  → {_cut}")
+        for name in mc:
+            mc[name] = mc[name].Filter(_cut)
+        if data_df is not None:
+            data_df = data_df.Filter(_cut)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -642,9 +802,22 @@ setup_style(dark=(ARGS.theme == "dark"))
 
 PLOT_DIR = os.path.join(ANA_DIR, "plots", ARGS.theme)
 os.makedirs(PLOT_DIR, exist_ok=True)
-for _subdir in ["stacked", "shape", "eff_stacked", "sig_stacked", "overlay",
-                "data_stacked", "data_shape", "data_eff_stacked", "data_sig_stacked"]:
-    os.makedirs(os.path.join(PLOT_DIR, _subdir), exist_ok=True)
+
+
+def _plot_path(category, plot_type, trig_name=None, var_name=""):
+    """Build plot output path and ensure directory exists.
+
+    category:  "mc" or "data"
+    plot_type: "stacked", "shape", "eff", "sig", "overlay", "gen"
+    trig_name: trigger name (creates subdirectory), None for overlay/gen
+    var_name:  variable name for the filename (without .png)
+    """
+    if trig_name:
+        d = os.path.join(PLOT_DIR, category, plot_type, trig_name)
+    else:
+        d = os.path.join(PLOT_DIR, category, plot_type)
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, f"{var_name}.png")
 
 TRIG_LIST = [
     ("NoTrigger",    None),
@@ -654,7 +827,7 @@ TRIG_LIST = [
 
 CUTFLOW_STEPS = [
     ("Trigger",                       None),
-    ("≥4 jets",                       "nScoutingPFJetRecluster >= 4"),
+    ("≥4 jets",                       "nScoutingPFJetRecluster2 >= 4"),
     ("4 jets pT > 20",                "ak4_pt0 > 20 && ak4_pt1 > 20 && ak4_pt2 > 20 && ak4_pt3 > 20"),
     (f"2 b-tag (BvsAll > {BTAG_WP})", f"b0_score > {BTAG_WP} && b1_score > {BTAG_WP}"),
     ("H→bb cand (m_jj ∈ [100,150])",  "has_hbb"),
@@ -694,10 +867,10 @@ PLOT_VARS = [
     # -- b-tagged jets --
     ("b0_pt",     r"$b_0$ jet $p_T$ [GeV]",          36,    0,  1000),
     ("b1_pt",     r"$b_1$ jet $p_T$ [GeV]",          36,    0,   600),
-    ("b0_score",  r"$b_0$ PNet $b/(b+c+cc+g+uds+undef)$", 25,  0,     1),
-    ("b1_score",  r"$b_1$ PNet $b/(b+c+cc+g+uds+undef)$", 25,  0,     1),
-    ("b0_raw",    r"$b_0$ PNet raw prob\_b",           25,    0,     1),
-    ("b1_raw",    r"$b_1$ PNet raw prob\_b",           25,    0,     1),
+    ("b0_score",  r"$b_0$ UParT BvsAll",                25,  0,     1),
+    ("b1_score",  r"$b_1$ UParT BvsAll",                25,  0,     1),
+    ("b0_raw",    r"$b_0$ UParT raw prob\_b",           25,    0,     1),
+    ("b1_raw",    r"$b_1$ UParT raw prob\_b",           25,    0,     1),
     ("mbb",       r"$m_{bb}$ [GeV]",                  30,    0,   300),
     ("dR_bb",     r"$\Delta R(b_0, b_1)$",           30,    0,     6),
     ("ptbb",      r"$p_T^{bb}$ [GeV]",               30,    0,  1000),
@@ -726,6 +899,56 @@ PLOT_VARS = [
         (f"ak8_massCorr{i}",  rf"{lbl} AK8 regressed mass [GeV]",                  40,   0,   400),
         (f"ak8_massRes{i}",   rf"{lbl} AK8 resonance mass [GeV]",                  40,   0,   400),
     ]
+] + [
+    entry
+    for cand, clbl in [("Hbb", r"$H \to bb$"), ("Htt", r"$H \to \tau_h\tau_h$"),
+                        ("Htm", r"$H \to \tau_\mu\tau_h$"), ("Hte", r"$H \to \tau_e\tau_h$")]
+    for entry in [
+        (f"ak8_{cand}_pt",    rf"{clbl} cand AK8 $p_T$ [GeV]",       50, 150, 1000),
+        (f"ak8_{cand}_eta",   rf"{clbl} cand AK8 $\eta$",             30,  -5,    5),
+        (f"ak8_{cand}_mass",  rf"{clbl} cand AK8 mass [GeV]",         40,   0,  400),
+        (f"ak8_{cand}_msd",   rf"{clbl} cand AK8 $m_{{SD}}$ [GeV]",   40,   0,  300),
+        (f"ak8_{cand}_score", rf"{clbl} cand AK8 score",               25,   0,    1),
+    ]
+] + [
+    ("ak8_dR_Hbb_Htt", r"$\Delta R(H_{bb}, H_{\tau\tau})$ cand AK8", 30, 0, 6),
+    # -- Gen-matched AK8 tagger scores (signal only, bkg = empty) --
+    ("ak8_genHbb_match_dR",       r"$\Delta R$(gen $H_{bb}$, matched AK8)",                    25, 0, 1),
+    ("ak8_genHbb_match_Xbb",      r"Gen-matched $H_{bb}$ AK8 raw $X_{bb}$",                   25, 0, 1),
+    ("ak8_genHbb_match_XbbVsAll", r"Gen-matched $H_{bb}$ AK8 $X_{bb}$ vs All",                25, 0, 1),
+    ("ak8_genHtt_match_dR",       r"$\Delta R$(gen $H_{\tau\tau}$, matched AK8)",              25, 0, 1),
+    ("ak8_genHtt_match_Xtt",      r"Gen-matched $H_{\tau\tau}$ AK8 raw $X_{\tau_h\tau_h}$",   25, 0, 1),
+    ("ak8_genHtt_match_XttVsAll", r"Gen-matched $H_{\tau\tau}$ AK8 $X_{\tau_h\tau_h}$ vs All", 25, 0, 1),
+    # -- Gen-matched AK4 UParT scores (signal only, bkg = empty) --
+    ("ak4_genb1_dR",         r"$\Delta R$(gen $b_1$, AK4)",                  25, 0, 0.5),
+    ("ak4_genb1_BvsAll",     r"Gen-matched $b_1$ AK4 UParT BvsAll",         25, 0, 1),
+    ("ak4_genb2_dR",         r"$\Delta R$(gen $b_2$, AK4)",                  25, 0, 0.5),
+    ("ak4_genb2_BvsAll",     r"Gen-matched $b_2$ AK4 UParT BvsAll",         25, 0, 1),
+    ("ak4_gentau1_dR",       r"$\Delta R$(gen $\tau_1$, AK4)",               25, 0, 0.5),
+    ("ak4_gentau1_TaupVsAll", r"Gen-matched $\tau_1$ AK4 UParT TaupVsAll",  25, 0, 1),
+    ("ak4_gentau2_dR",       r"$\Delta R$(gen $\tau_2$, AK4)",               25, 0, 0.5),
+    ("ak4_gentau2_TaupVsAll", r"Gen-matched $\tau_2$ AK4 UParT TaupVsAll",  25, 0, 1),
+]
+
+# 2D histograms (signal only, gen-matched AK8 tagger studies)
+# (name, xvar, yvar, xlabel, ylabel, nx, x0, x1, ny, y0, y1)
+PLOT_VARS_2D = [
+    ("gen2d_Hbb_dR_vs_Xbb",
+     "ak8_genHbb_match_dR", "ak8_genHbb_match_XbbVsAll",
+     r"$\Delta R$(gen $H_{bb}$, AK8)", r"$X_{bb}$ vs All",
+     25, 0, 1.0, 25, 0, 1.0),
+    ("gen2d_Htt_dR_vs_Xtt",
+     "ak8_genHtt_match_dR", "ak8_genHtt_match_XttVsAll",
+     r"$\Delta R$(gen $H_{\tau\tau}$, AK8)", r"$X_{\tau\tau}$ vs All",
+     25, 0, 1.0, 25, 0, 1.0),
+    ("gen2d_Hbb_Xbb_vs_Htt_Xtt",
+     "ak8_genHbb_match_XbbVsAll", "ak8_genHtt_match_XttVsAll",
+     r"$X_{bb}$ vs All (H$\to$bb cand)", r"$X_{\tau\tau}$ vs All (H$\to\tau\tau$ cand)",
+     25, 0, 1.0, 25, 0, 1.0),
+    ("gen2d_Hbb_pt_vs_Xbb",
+     "gen_pt_Hbb", "ak8_genHbb_match_XbbVsAll",
+     r"Gen $H \to bb$ $p_T$ [GeV]", r"$X_{bb}$ vs All",
+     25, 150, 600, 25, 0, 1.0),
 ]
 
 # ── Filter variables if --plot-vars given ──
@@ -796,7 +1019,57 @@ if not ARGS.recache:
 # Skim — write slim ROOT files if requested (then exit)
 # ══════════════════════════════════════════════════════════════════════════════
 if ARGS.skim or ARGS.reslim:
-    run_skim(mc, mc_files_map, force=ARGS.reslim)
+    # Collect all expression strings from this script for branch auto-detection.
+    # Rather than wrapping every .Define() call, we read the script source and
+    # extract all string literals that were passed to Define/Filter. This works
+    # because all expressions are Python string literals or f-strings that are
+    # fully expanded by the time the script runs.
+    import ast as _ast
+    with open(__file__, "r") as _f:
+        _source = _f.read()
+    _tree = _ast.parse(_source)
+    for _node in _ast.walk(_tree):
+        if isinstance(_node, _ast.Call):
+            func = _node.func
+            # Match .Define("col", "expr") and .Filter("expr")
+            if isinstance(func, _ast.Attribute) and func.attr in ("Define", "Filter"):
+                for arg in _node.args:
+                    if isinstance(arg, _ast.Constant) and isinstance(arg.value, str):
+                        rdf_exprs.append(arg.value)
+
+    # Also add trigger expressions (constructed at runtime, not in source literals)
+    rdf_exprs.append(DST_JetHT_expr)
+    rdf_exprs.append(PARKING_HH_expr)
+
+    # Also add f-string expressions that reference AK8 branches (expanded at runtime)
+    _AK8_skim = "ScoutingFatPFJetRecluster"
+    _SGP_skim = f"{_AK8_skim}_scoutGlobalParT"
+    for _i in range(3):
+        rdf_exprs.append(f"{_AK8_skim}_pt[{_i}]")
+        rdf_exprs.append(f"{_AK8_skim}_eta[{_i}]")
+        rdf_exprs.append(f"{_AK8_skim}_mass[{_i}]")
+        rdf_exprs.append(f"{_AK8_skim}_msoftdrop[{_i}]")
+        rdf_exprs.append(f"{_SGP_skim}_prob_Xbb[{_i}]")
+        rdf_exprs.append(f"{_SGP_skim}_prob_Xtauhtauh[{_i}]")
+        rdf_exprs.append(f"{_SGP_skim}_prob_Xtauhtaum[{_i}]")
+        rdf_exprs.append(f"{_SGP_skim}_prob_Xtauhtaue[{_i}]")
+        rdf_exprs.append(f"{_SGP_skim}_prob_QCD[{_i}]")
+        rdf_exprs.append(f"{_SGP_skim}_massCorrGeneric[{_i}]")
+        rdf_exprs.append(f"{_SGP_skim}_massCorrResonance[{_i}]")
+    rdf_exprs.append(f"n{_AK8_skim}")
+    # Gen branches
+    rdf_exprs.append("GenPart_pdgId GenPart_genPartIdxMother GenPart_statusFlags")
+    rdf_exprs.append("GenPart_pt GenPart_eta GenPart_phi GenPart_mass")
+
+    first_name = next(iter(mc_files_map))
+    branches = detect_used_branches(rdf_exprs, mc_files_map[first_name][0])
+    mc_branches = [b for b in branches if b not in ("run", "luminosityBlock")]
+    print(f"[skim] Auto-detected {len(mc_branches)} branches from {len(rdf_exprs)} expressions")
+    for b in mc_branches:
+        print(f"  {b}")
+
+    run_skim(mc, mc_branches, mc_files_map=mc_files_map,
+             force=getattr(ARGS, 'force', False))
     print("Skim complete. Re-run without --skim to use slim files.")
     sys.exit(0)
 
@@ -876,13 +1149,14 @@ if not _cache_loaded:
 
             # Per-mode yield sums (for cutflow table)
             mode_w = {}  # mode_int -> [Sum ptrs]
+            _proc_samples = {"DY": dy_samples, "TT": tt_samples,
+                             "HHbbtt": sig_samples, "QCD": qcd_samples}
             for mode in ACTIVE_MODES:
                 info = DECAY_MODES[mode]
-                proc = info["process"]
-                if proc == "DY":      samples_for_mode = dy_samples
-                elif proc == "TT":    samples_for_mode = tt_samples
-                elif proc == "HHbbtt": samples_for_mode = sig_samples
-                else: continue
+                samples_for_mode = _proc_samples.get(info["process"], [])
+                if not samples_for_mode:
+                    mode_w[mode] = []
+                    continue
                 mode_w[mode] = [mc_sel[s].Filter(f"decayMode=={mode}").Sum("w")
                                 for s in samples_for_mode]
                 unified_ptrs.extend(mode_w[mode])
@@ -901,17 +1175,20 @@ if not _cache_loaded:
     
     # ── Phase 2: Book MC denominator histograms (no trigger) ──
     # Build mc_denom_groups from global decay mode LUT
+    _proc_to_samples = {"DY": dy_samples, "TT": tt_samples,
+                         "HHbbtt": sig_samples, "QCD": qcd_samples}
+
+    # Which modes actually have samples? (determines group ordering)
+    _BUILT_MODES = [m for m in ACTIVE_MODES
+                    if _proc_to_samples.get(DECAY_MODES[m]["process"], [])]
+
     def _build_groups(sample_dfs):
         """Build mc_groups list from ACTIVE_MODES using decayMode filter."""
         groups = []
-        for mode in ACTIVE_MODES:
+        for mode in _BUILT_MODES:
             info = DECAY_MODES[mode]
             proc = info["process"]
-            if proc == "DY":       slist = dy_samples
-            elif proc == "TT":     slist = tt_samples
-            elif proc == "HHbbtt": slist = sig_samples
-            elif proc == "QCD":    slist = qcd_samples
-            else: continue
+            slist = _proc_to_samples[proc]
             if proc == "QCD":
                 dfs = [sample_dfs[s] for s in slist]  # no decayMode filter
             else:
@@ -922,7 +1199,8 @@ if not _cache_loaded:
     mc_denom_groups = _build_groups(mc_acc)
     
     # AK8 variables use -1 sentinel when no jet passes pT cut; filter those out
-    _AK8_VARS = {v[0] for v in PLOT_VARS if v[0].startswith("ak8_")}
+    _AK8_VARS = {v[0] for v in PLOT_VARS
+                 if v[0].startswith("ak8_") or v[0].startswith("ak4_gen")}
 
     denom_book = {}
     for var_name, _xlabel, nbins, vmin, vmax in PLOT_VARS:
@@ -943,9 +1221,9 @@ if not _cache_loaded:
     mc_items_by_trig = {}
     _histo_books = {}  # trig_name -> {var_name -> [[ptrs per group]]}
     
-    # Derive sig/bkg indices from ACTIVE_MODES ordering
-    sig_indices = [i for i, m in enumerate(ACTIVE_MODES) if m in SIG_MODES]
-    bkg_indices = [i for i, m in enumerate(ACTIVE_MODES) if m in BKG_MODES]
+    # Derive sig/bkg indices from _BUILT_MODES (only modes with samples)
+    sig_indices = [i for i, m in enumerate(_BUILT_MODES) if m in SIG_MODES]
+    bkg_indices = [i for i, m in enumerate(_BUILT_MODES) if m in BKG_MODES]
 
     for trig_name in trig_selections:
         sel = trig_selections[trig_name]
@@ -971,10 +1249,26 @@ if not _cache_loaded:
                 histo_book[var_name].append(group_ptrs)
         _histo_books[trig_name] = histo_book
     
+    # ── Phase 2b: Book 2D histograms (signal only, gen-matched) ──
+    h2d_book = {}
+    for pname, xvar, yvar, _xl, _yl, nx, x0, x1, ny, y0, y1 in PLOT_VARS_2D:
+        h2d_book[pname] = []
+        for trig_name in trig_selections:
+            mc_sel_t = trig_selections[trig_name]["mc_sel"]
+            for s in sig_samples:
+                df_v = mc_sel_t[s].Filter(f"{xvar} > -0.5f && {yvar} > -0.5f")
+                uid = f"h2d_{pname}_{s}_{trig_name}"
+                ptr = df_v.Histo2D(
+                    ROOT.RDF.TH2DModel(uid, f";{xvar};{yvar}",
+                                       nx, x0, x1, ny, y0, y1),
+                    xvar, yvar, "w")
+                h2d_book[pname].append((trig_name, s, ptr))
+                unified_ptrs.append(ptr)
+
     # ══════════════════════════════════════════════════════════════════════════════
     # Run ONE unified event loop for all Phase 1 + Phase 2 actions
     # ══════════════════════════════════════════════════════════════════════════════
-    
+
     print(f"\nBooked {len(unified_ptrs)} total actions (Phase 1+2 combined)")
     print(f"Running unified event loop ...", flush=True)
     sys.stdout.flush()
@@ -1128,8 +1422,8 @@ for trig_name in trig_selections:
     mc_items = mc_items_by_trig[trig_name]
 
     # Comparison: gen mHH vs signal m4j (MC only, data added in Phase 5)
-    mHH_path = os.path.join(PLOT_DIR, "shape", f"{trig_name}_mHH_m4j.png")
-    if (sel["sig_mHH_ptrs"] and "m4j" in h_by_var
+    mHH_path = _plot_path("mc", "shape", trig_name, "mHH_m4j")
+    if (sel["sig_mHH_ptrs"] and "m4j" in h_by_var and sig_indices
             and (not os.path.exists(mHH_path) or ARGS.overwrite)):
         fig, ax = plt.subplots(figsize=(8, 6))
 
@@ -1172,7 +1466,7 @@ for trig_name in trig_selections:
         h_mc_list = h_by_var[var_name]
 
         if do_stacked:
-            outpath = os.path.join(PLOT_DIR, "stacked", f"{trig_name}_{var_name}.png")
+            outpath = _plot_path("mc", "stacked", trig_name, var_name)
             if os.path.exists(outpath) and not ARGS.overwrite:
                 print(f"Skipping (exists): {outpath}")
             else:
@@ -1186,7 +1480,7 @@ for trig_name in trig_selections:
                 plt.close(fig)
 
         if do_shape:
-            outpath = os.path.join(PLOT_DIR, "shape", f"{trig_name}_{var_name}.png")
+            outpath = _plot_path("mc", "shape", trig_name, var_name)
             if os.path.exists(outpath) and not ARGS.overwrite:
                 print(f"Skipping (exists): {outpath}")
             else:
@@ -1200,7 +1494,7 @@ for trig_name in trig_selections:
 
         # Stacked + trigger efficiency panel (MC only) — skip for NoTrigger
         if do_stacked and sel["trig"] is not None:
-            outpath = os.path.join(PLOT_DIR, "eff_stacked", f"{trig_name}_{var_name}.png")
+            outpath = _plot_path("mc", "eff", trig_name, var_name)
             if os.path.exists(outpath) and not ARGS.overwrite:
                 print(f"Skipping (exists): {outpath}")
             else:
@@ -1218,7 +1512,7 @@ for trig_name in trig_selections:
 
         # Stacked + S/sqrt(B) panel (MC only)
         if do_stacked:
-            outpath = os.path.join(PLOT_DIR, "sig_stacked", f"{trig_name}_{var_name}.png")
+            outpath = _plot_path("mc", "sig", trig_name, var_name)
             if os.path.exists(outpath) and not ARGS.overwrite:
                 print(f"Skipping (exists): {outpath}")
             else:
@@ -1242,7 +1536,7 @@ for trig_name in trig_selections:
 
 if do_shape:
     for var_name, xlabel, nbins, vmin, vmax in PLOT_VARS:
-        outpath = os.path.join(PLOT_DIR, "overlay", f"{var_name}.png")
+        outpath = _plot_path("mc", "overlay", var_name=var_name)
         if os.path.exists(outpath) and not ARGS.overwrite:
             print(f"Skipping (exists): {outpath}")
             continue
@@ -1265,14 +1559,16 @@ if do_shape:
         plt.close(fig)
 
     # Per-signal-channel trigger overlays
-    SIG_CHANNELS = [
-        (sig_indices[0], "hh", r"$HH\to bb\tau_h\tau_h$"),
-        (sig_indices[1], "hm", r"$HH\to bb\tau_\mu\tau_h$"),
-        (sig_indices[2], "he", r"$HH\to bb\tau_e\tau_h$"),
-    ]
+    SIG_CHANNELS = []
+    if len(sig_indices) >= 3:
+        SIG_CHANNELS = [
+            (sig_indices[0], "hh", r"$HH\to bb\tau_h\tau_h$"),
+            (sig_indices[1], "hm", r"$HH\to bb\tau_\mu\tau_h$"),
+            (sig_indices[2], "he", r"$HH\to bb\tau_e\tau_h$"),
+        ]
     for var_name, xlabel, nbins, vmin, vmax in PLOT_VARS:
         for gi, ch_key, ch_label in SIG_CHANNELS:
-            outpath = os.path.join(PLOT_DIR, "overlay", f"{ch_key}_{var_name}.png")
+            outpath = _plot_path("mc", "overlay", var_name=f"{ch_key}_{var_name}")
             if os.path.exists(outpath) and not ARGS.overwrite:
                 print(f"Skipping (exists): {outpath}")
                 continue
@@ -1290,6 +1586,30 @@ if do_shape:
             plt.close(fig)
 
     print("Phase 3.5: Trigger overlay plots done")
+
+    # ── Phase 3.6: 2D gen-matched plots (signal only) ──
+    for pname, _xvar, _yvar, xlabel, ylabel, *_ in PLOT_VARS_2D:
+        # Group pointers by trigger, sum over signal samples
+        trigs_seen = {}
+        for trig_name, s, ptr in h2d_book.get(pname, []):
+            h2 = ptr.GetPtr().Clone()
+            h2.Scale(LUMI)
+            if trig_name not in trigs_seen:
+                trigs_seen[trig_name] = h2
+            else:
+                trigs_seen[trig_name].Add(h2)
+
+        for trig_name, h2_combined in trigs_seen.items():
+            outpath = _plot_path("mc", "gen2d", trig_name, var_name=f"{pname}")
+            if os.path.exists(outpath) and not ARGS.overwrite:
+                print(f"Skipping (exists): {outpath}")
+                continue
+            fig = plot_2d_hist(h2_combined, xlabel=xlabel, ylabel=ylabel)
+            fig.savefig(outpath, dpi=150)
+            plt.close(fig)
+            print(f"Saved: {outpath}")
+
+    print("Phase 3.6: 2D gen-matched plots done")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1372,7 +1692,7 @@ if not ARGS.no_data:
                 continue
 
             if do_stacked:
-                outpath = os.path.join(PLOT_DIR, "data_stacked", f"{trig_name}_{var_name}.png")
+                outpath = _plot_path("data", "stacked", trig_name, var_name)
                 if os.path.exists(outpath) and not ARGS.overwrite:
                     print(f"Skipping (exists): {outpath}")
                 else:
@@ -1386,7 +1706,7 @@ if not ARGS.no_data:
                     plt.close(fig)
 
             if do_shape:
-                outpath = os.path.join(PLOT_DIR, "data_shape", f"{trig_name}_{var_name}.png")
+                outpath = _plot_path("data", "shape", trig_name, var_name)
                 if os.path.exists(outpath) and not ARGS.overwrite:
                     print(f"Skipping (exists): {outpath}")
                 else:
@@ -1401,7 +1721,7 @@ if not ARGS.no_data:
 
             # Stacked + trigger efficiency panel (MC + Data) — skip for NoTrigger
             if do_stacked and trig_selections[trig_name]["trig"] is not None:
-                outpath = os.path.join(PLOT_DIR, "data_eff_stacked", f"{trig_name}_{var_name}.png")
+                outpath = _plot_path("data", "eff", trig_name, var_name)
                 if os.path.exists(outpath) and not ARGS.overwrite:
                     print(f"Skipping (exists): {outpath}")
                 else:
@@ -1422,7 +1742,7 @@ if not ARGS.no_data:
 
             # Stacked + S/sqrt(B) panel (MC + Data)
             if do_stacked:
-                outpath = os.path.join(PLOT_DIR, "data_sig_stacked", f"{trig_name}_{var_name}.png")
+                outpath = _plot_path("data", "sig", trig_name, var_name)
                 if os.path.exists(outpath) and not ARGS.overwrite:
                     print(f"Skipping (exists): {outpath}")
                 else:
@@ -1439,7 +1759,7 @@ if not ARGS.no_data:
 
         # Comparison: gen mHH vs signal m4j vs data m4j
         sel = trig_selections[trig_name]
-        cmp_path = os.path.join(PLOT_DIR, "data_shape", f"{trig_name}_mHH_m4j.png")
+        cmp_path = _plot_path("data", "shape", trig_name, "mHH_m4j")
         if (sel["sig_mHH_ptrs"] and "m4j" in h_by_var
                 and (not os.path.exists(cmp_path) or ARGS.overwrite)):
             fig, ax = plt.subplots(figsize=(8, 6))

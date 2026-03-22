@@ -1,0 +1,20 @@
+# Interactive cuts — edit and re-run to see effect on plots.
+# Each entry is a C++ expression applied as an RDataFrame Filter.
+# Comment out or remove a line to disable that cut.
+#
+# These cuts are applied AFTER the standard preselection
+# (≥4 jets, pT > 20, etc.) and AFTER all Define() columns are built,
+# so you can use any defined variable (ak8_Hbb_score, HT, nFatJets, etc.)
+#
+# Examples:
+#   - "ak8_Hbb_score > 0.5"
+#   - "ak8_Htt_score > 0.3"
+#   - "nFatJets >= 2"
+#   - "HT > 500"
+#   - "b0_score > 0.3"
+
+cuts:
+  - "nFatJets >= 2"
+  - "ak8_Hbb_mass < 150"
+  - "ak8_Htt_mass < 150"
+  - "ak8_dR_Hbb_Htt < 0.8 || (ak8_dR_Hbb_Htt > 2.5 && ak8_dR_Hbb_Htt < 3.5)"

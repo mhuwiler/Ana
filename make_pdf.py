@@ -14,15 +14,15 @@ Usage:
 
 Plot directory structure:
     plots/{theme}/
-    ├── stacked/{trig}_{var}.png
-    ├── shape/{trig}_{var}.png
-    ├── eff_stacked/{trig}_{var}.png
-    ├── sig_stacked/{trig}_{var}.png
-    ├── overlay/{var}.png, overlay/{ch}_{var}.png
-    ├── data_stacked/{trig}_{var}.png
-    ├── data_shape/{trig}_{var}.png
-    ├── data_eff_stacked/{trig}_{var}.png
-    └── data_sig_stacked/{trig}_{var}.png
+    ├── mc/stacked/{trig}/{var}.png
+    ├── mc/shape/{trig}/{var}.png
+    ├── mc/eff/{trig}/{var}.png
+    ├── mc/sig/{trig}/{var}.png
+    ├── mc/overlay/{var}.png, mc/overlay/{ch}_{var}.png
+    ├── data/stacked/{trig}/{var}.png
+    ├── data/shape/{trig}/{var}.png
+    ├── data/eff/{trig}/{var}.png
+    └── data/sig/{trig}/{var}.png
 """
 
 import argparse
@@ -43,8 +43,8 @@ parser.add_argument("-o", "--output", default=None,
 parser.add_argument("--compare", action="store_true",
                     help="Generate a comparison PDF with all triggers side by side per variable")
 parser.add_argument("--plot-type", nargs="+",
-                    choices=["stacked", "shape", "sig_stacked", "eff_stacked",
-                             "data_stacked", "data_shape", "data_eff_stacked", "data_sig_stacked",
+                    choices=["stacked", "shape", "sig", "eff",
+                             "data_stacked", "data_shape", "data_eff", "data_sig",
                              "trigger_overlay"],
                     default=["shape"],
                     help="Plot type(s) for comparison PDF — each becomes a row (default: shape)")
@@ -68,26 +68,19 @@ if not all_pngs:
 # ── Identify triggers and variables from folder structure ──
 TRIGGERS = ["NoTrigger", "DST_JetHT", "PARKING_HH"]
 
-PLOT_TYPE_DIRS = (
-    "stacked", "shape", "sig_stacked", "eff_stacked",
-    "data_stacked", "data_shape", "data_eff_stacked", "data_sig_stacked",
-)
+# New directory structure: mc/{plot_type}/{trig}/{var}.png, data/{plot_type}/{trig}/{var}.png
+# Overlay: mc/overlay/{var}.png, mc/overlay/{ch}_{var}.png
 
 # Build a lookup: (trigger, var_name) -> {plot_type: filepath}
 plot_map = {}
 
 for png in all_pngs:
-    # Get the subfolder name and filename
     rel = os.path.relpath(png, PLOT_DIR)
     parts = rel.split(os.sep)
-    if len(parts) != 2:
-        continue  # skip files not in a subdirectory (e.g. cutflow.md)
-    subdir, fname = parts
-    name = fname.replace(".png", "")
 
-    # Overlay subfolder: {var}.png or {ch}_{var}.png
-    if subdir == "overlay":
-        # Check for per-channel prefix
+    # mc/overlay/{var}.png or mc/overlay/{ch}_{var}.png (3 parts)
+    if len(parts) == 3 and parts[0] == "mc" and parts[1] == "overlay":
+        name = parts[2].replace(".png", "")
         overlay_key = "_overlay"
         var = name
         for ch in ("hh_", "hm_", "he_"):
@@ -101,26 +94,23 @@ for png in all_pngs:
         plot_map[key]["trigger_overlay"] = png
         continue
 
-    # Per-trigger plot type dirs: {trig}_{var}.png
-    if subdir not in PLOT_TYPE_DIRS:
+    # mc/{plot_type}/{trig}/{var}.png or data/{plot_type}/{trig}/{var}.png (4 parts)
+    if len(parts) != 4:
         continue
-
-    ptype = subdir
-    trig = None
-    var = None
-    for t in TRIGGERS:
-        if name.startswith(t + "_"):
-            trig = t
-            var = name[len(t) + 1:]
-            break
-
-    if trig is None or var is None:
+    category, ptype, trig, fname = parts
+    if category not in ("mc", "data"):
         continue
+    if trig not in TRIGGERS:
+        continue
+    var = fname.replace(".png", "")
+
+    # Map to unified plot_type key (prepend "data_" for data category)
+    ptype_key = f"data_{ptype}" if category == "data" else ptype
 
     key = (trig, var)
     if key not in plot_map:
         plot_map[key] = {}
-    plot_map[key][ptype] = png
+    plot_map[key][ptype_key] = png
 
 # ── Order variables logically ──
 VAR_ORDER = [

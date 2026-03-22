@@ -995,3 +995,43 @@ def plot_trigger_shape_overlay(h_total_by_trig, *, logy=False, title=None):
         ax.set_yscale("log")
 
     return fig, ax
+
+
+# ── 2D histogram (heatmap) ──────────────────────────────────────────────────
+
+def th2_to_np(h2):
+    """Convert ROOT TH2 to numpy arrays: (xedges, yedges, vals)."""
+    nx = h2.GetNbinsX()
+    ny = h2.GetNbinsY()
+    xedges = np.array([h2.GetXaxis().GetBinLowEdge(i) for i in range(1, nx + 2)])
+    yedges = np.array([h2.GetYaxis().GetBinLowEdge(i) for i in range(1, ny + 2)])
+    vals = np.zeros((ny, nx))
+    for iy in range(1, ny + 1):
+        for ix in range(1, nx + 1):
+            vals[iy - 1, ix - 1] = h2.GetBinContent(ix, iy)
+    return xedges, yedges, vals
+
+
+def plot_2d_hist(h2, *, xlabel=None, ylabel=None, title=None,
+                 log_z=True, cmap="viridis"):
+    """Plot a ROOT TH2 as a matplotlib pcolormesh heatmap."""
+    from matplotlib.colors import LogNorm
+
+    xedges, yedges, vals = th2_to_np(h2)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    if log_z and vals.max() > 0 and np.any(vals > 0):
+        vmin = max(vals[vals > 0].min(), 1e-1)
+        norm = LogNorm(vmin=vmin, vmax=vals.max())
+    else:
+        norm = None
+    mesh = ax.pcolormesh(xedges, yedges, vals, cmap=cmap, norm=norm)
+    fig.colorbar(mesh, ax=ax, label="Events")
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    hep.cms.label("Work in Progress", data=False, ax=ax)
+    return fig

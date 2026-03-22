@@ -290,7 +290,7 @@ def ls_nanoaod_files_many(
         opts = per_sample_opts.get(s, {})
         try:
             files = ls_nanoaod_files_from_fs(
-                base_dir=base_dir,
+                base_dir=opts.get("base_dir", base_dir),
                 sample=s,
                 dataset_tag=opts.get("dataset_tag", dataset_tag),
                 production_id=opts.get("production_id", production_id),
