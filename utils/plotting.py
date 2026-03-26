@@ -961,9 +961,16 @@ def plot_shape_from_hists(
 # ---------------------------------------------------------------------------
 
 TRIGGER_STYLES = {
-    "NoTrigger":  {"color": "tab:gray",   "linestyle": "-",  "linewidth": 2.5},
-    "DST_JetHT":  {"color": "tab:blue",   "linestyle": "--", "linewidth": 2.5},
-    "PARKING_HH": {"color": "tab:orange",  "linestyle": ":",  "linewidth": 3.0},
+    "NoTrigger":         {"color": "tab:gray",   "linestyle": "-",  "linewidth": 2.5},
+    "DST_JetHT":         {"color": "tab:blue",   "linestyle": "--", "linewidth": 2.5},
+    "DST_Muon":          {"color": "tab:green",  "linestyle": "-.", "linewidth": 2.5},
+    "DST_Electron":      {"color": "tab:red",    "linestyle": "--", "linewidth": 2.5},
+    "PARKING_HH":        {"color": "tab:orange", "linestyle": ":",  "linewidth": 3.0},
+    # Exclusive variants (same hue, thinner line)
+    "DST_JetHT_excl":    {"color": "tab:blue",   "linestyle": "--", "linewidth": 1.5},
+    "DST_Muon_excl":     {"color": "tab:green",  "linestyle": "-.", "linewidth": 1.5},
+    "DST_Electron_excl": {"color": "tab:red",    "linestyle": "--", "linewidth": 1.5},
+    "PARKING_HH_excl":   {"color": "tab:orange", "linestyle": ":",  "linewidth": 2.0},
 }
 
 

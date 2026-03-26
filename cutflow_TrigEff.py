@@ -126,6 +126,8 @@ from utils.data import (
 )
 from utils.triggers import (
     DST_JetHT_expr,
+    DST_MU_expr,
+    DST_EL_expr,
     PARKING_HH_expr,
 )
 from utils.skim import r_define, r_filter, rdf_exprs, detect_used_branches, run_skim, load_slim_or_eos
@@ -148,7 +150,7 @@ import matplotlib.pyplot as plt
 # Histogram cache helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
-_CACHE_VERSION = 1   # bump to invalidate all caches
+_CACHE_VERSION = 2   # bump to invalidate all caches
 
 _INVALIDATION_FILES = [
     "cutflow_TrigEff.py",
@@ -181,7 +183,7 @@ def _cache_meta(max_files, plot_vars_names):
 
 
 def save_hist_cache(cache_path, mc_hists_by_trig, mc_denom_hists,
-                    mc_items_by_trig, lumi, meta, gen_hists=None):
+                    mc_items_by_trig, lumi, meta, gen_hists=None, excl_hists=None):
     """Save all materialized TH1 objects to a ROOT file."""
     import json
     tf = ROOT.TFile.Open(cache_path, "RECREATE")
@@ -211,14 +213,25 @@ def save_hist_cache(cache_path, mc_hists_by_trig, mc_denom_hists,
             for gi, h in enumerate(h_list):
                 h.Write(f"g{gi}")
 
-    # Save gen-level Higgs histograms (signal only)
+    # Save gen-level histograms (signal only, per decay channel)
     if gen_hists:
         for trig_name, h_by_var in gen_hists.items():
-            for var_name, h in h_by_var.items():
+            for var_name, h_by_mode in h_by_var.items():
                 dname = f"gen/{trig_name}/{var_name}"
                 tf.mkdir(dname)
                 tf.cd(dname)
-                h.Write("h")
+                for mode, h in h_by_mode.items():
+                    h.Write(f"m{mode}")
+
+    # Save exclusive-trigger histograms
+    if excl_hists:
+        for trig_name, h_by_var in excl_hists.items():
+            for var_name, h_list in h_by_var.items():
+                dname = f"mc_excl/{trig_name}/{var_name}"
+                tf.mkdir(dname)
+                tf.cd(dname)
+                for gi, h in enumerate(h_list):
+                    h.Write(f"g{gi}")
 
     tf.Close()
     sz = os.path.getsize(cache_path) / 1e6
@@ -296,24 +309,48 @@ def load_hist_cache(cache_path, expected_meta, trig_names):
             h_by_var[var_name] = h_list
         mc_hists_by_trig[trig_name] = h_by_var
 
-    # Load gen-level Higgs histograms (signal only)
+    # Load gen-level histograms (signal only, per decay channel)
     gen_hists_by_trig = {}
     gen_top = tf.Get("gen")
     if gen_top:
         for trig_key in gen_top.GetListOfKeys():
             trig_name = trig_key.GetName()
-            trig_dir = tf.Get(f"gen/{trig_name}")
-            h_by_var = {}
+            trig_dir  = tf.Get(f"gen/{trig_name}")
+            h_by_var  = {}
             for var_key in trig_dir.GetListOfKeys():
                 var_name = var_key.GetName()
-                var_dir = tf.Get(f"gen/{trig_name}/{var_name}")
-                h = var_dir.Get("h").Clone()
-                h.SetDirectory(0)
-                h_by_var[var_name] = h
+                var_dir  = tf.Get(f"gen/{trig_name}/{var_name}")
+                h_by_mode = {}
+                for mkey in var_dir.GetListOfKeys():
+                    mode = int(mkey.GetName()[1:])  # "m20" -> 20
+                    h = var_dir.Get(mkey.GetName()).Clone()
+                    h.SetDirectory(0)
+                    h_by_mode[mode] = h
+                h_by_var[var_name] = h_by_mode
             gen_hists_by_trig[trig_name] = h_by_var
 
+    # Load exclusive-trigger histograms (optional — missing in old caches → empty dict)
+    mc_hists_excl_by_trig = {}
+    excl_top = tf.Get("mc_excl")
+    if excl_top:
+        for trig_key in excl_top.GetListOfKeys():
+            trig_name = trig_key.GetName()
+            trig_dir  = tf.Get(f"mc_excl/{trig_name}")
+            h_by_var  = {}
+            for var_key in trig_dir.GetListOfKeys():
+                var_name = var_key.GetName()
+                var_dir  = tf.Get(f"mc_excl/{trig_name}/{var_name}")
+                h_list   = []
+                for gkey in sorted(var_dir.GetListOfKeys(), key=lambda k: k.GetName()):
+                    h = gkey.ReadObj().Clone()
+                    h.SetDirectory(0)
+                    h_list.append(h)
+                h_by_var[var_name] = h_list
+            mc_hists_excl_by_trig[trig_name] = h_by_var
+
     tf.Close()
-    return mc_hists_by_trig, mc_denom_hists, mc_items_by_trig, lumi, gen_hists_by_trig
+    return (mc_hists_by_trig, mc_denom_hists, mc_items_by_trig, lumi,
+            gen_hists_by_trig, mc_hists_excl_by_trig)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -531,6 +568,10 @@ for name in sig_samples:
         .Define("gen_eta_HH",      "gen_HH_p4.Eta()")
         .Define("gen_phi_HH",      "gen_HH_p4.Phi()")
         .Define("gen_E_HH",        "gen_HH_p4.E()")
+        .Define("gen_tau1_charge",
+                "gen_HH.tau1 >= 0 ? (float)(GenPart_pdgId[gen_HH.tau1] > 0 ? -1 : 1) : -99.f")
+        .Define("gen_tau2_charge",
+                "gen_HH.tau2 >= 0 ? (float)(GenPart_pdgId[gen_HH.tau2] > 0 ? -1 : 1) : -99.f")
     )
     # -- Gen-match AK8 jets to gen H→bb and H→ττ --
     mc[name] = (mc[name]
@@ -828,6 +869,40 @@ for name in sig_samples:
             .Define(f"ak4_gen{_tl}_TaupVsAll", f"{_idx} >= 0 ? ak4_TaupVsAll[{_idx}] : -1.f")
         )
 
+# Charge misidentification columns: combined across tau1/tau2, keyed by true gen charge.
+# τ⁻ (pdgId=15): charge=-1 → charge < 0 && > -90 (excludes sentinel -99)
+# τ⁺ (pdgId=-15): charge=+1 → charge > 0 (sentinel -99 is negative, so naturally excluded)
+for name in sig_samples:
+    def _neg(tl): return (f"gen_{tl}_charge < 0.f && gen_{tl}_charge > -90.f"
+                          f" && ak4_gen{tl}_dR > -0.5f")
+    def _pos(tl): return f"gen_{tl}_charge > 0.f && ak4_gen{tl}_dR > -0.5f"
+    mc[name] = (mc[name]
+        # τ⁻ jet: correct-sign score (should peak at 1)
+        .Define("gen_taum_TaumVsAll",
+                f"({_neg('tau1')}) ? ak4_gentau1_TaumVsAll :"
+                f" ({_neg('tau2')}) ? ak4_gentau2_TaumVsAll : -1.f")
+        # τ⁻ jet: wrong-sign score (should peak at 0 if charge ID works)
+        .Define("gen_taum_TaupVsAll",
+                f"({_neg('tau1')}) ? ak4_gentau1_TaupVsAll :"
+                f" ({_neg('tau2')}) ? ak4_gentau2_TaupVsAll : -1.f")
+        # τ⁻ jet: combined charge-agnostic score (uses ak4_TauVsAll directly)
+        .Define("gen_taum_TauVsAll",
+                f"({_neg('tau1')}) ? ak4_gentau1_TauVsAll :"
+                f" ({_neg('tau2')}) ? ak4_gentau2_TauVsAll : -1.f")
+        # τ⁺ jet: correct-sign score (should peak at 1)
+        .Define("gen_taup_TaupVsAll",
+                f"({_pos('tau1')}) ? ak4_gentau1_TaupVsAll :"
+                f" ({_pos('tau2')}) ? ak4_gentau2_TaupVsAll : -1.f")
+        # τ⁺ jet: wrong-sign score (should peak at 0 if charge ID works)
+        .Define("gen_taup_TaumVsAll",
+                f"({_pos('tau1')}) ? ak4_gentau1_TaumVsAll :"
+                f" ({_pos('tau2')}) ? ak4_gentau2_TaumVsAll : -1.f")
+        # τ⁺ jet: combined charge-agnostic score (uses ak4_TauVsAll directly)
+        .Define("gen_taup_TauVsAll",
+                f"({_pos('tau1')}) ? ak4_gentau1_TauVsAll :"
+                f" ({_pos('tau2')}) ? ak4_gentau2_TauVsAll : -1.f")
+    )
+
 # Raw UParT prob scores for gen-matched jets
 _raw_scores = [
     ("raw_b",    "upart_b_raw"),
@@ -907,7 +982,23 @@ def _plot_path(category, plot_type, trig_name=None, var_name=""):
 TRIG_LIST = [
     ("NoTrigger",    None),
     ("DST_JetHT",    DST_JetHT_expr),
+    ("DST_Muon",     DST_MU_expr),
+    ("DST_Electron", DST_EL_expr),
     ("PARKING_HH",   PARKING_HH_expr),
+]
+
+# Exclusive triggers: events that fired ONLY one trigger (not any other)
+_trig_exprs = [e for _, e in TRIG_LIST if e is not None]
+def _excl(t):
+    others = " || ".join(e for e in _trig_exprs if e != t)
+    return f"({t}) && !({others})"
+
+EXCL_TRIG_LIST = [
+    ("NoTrigger",         None),
+    ("DST_JetHT_excl",    _excl(DST_JetHT_expr)),
+    ("DST_Muon_excl",     _excl(DST_MU_expr)),
+    ("DST_Electron_excl", _excl(DST_EL_expr)),
+    ("PARKING_HH_excl",   _excl(PARKING_HH_expr)),
 ]
 
 CUTFLOW_STEPS = [
@@ -1072,6 +1163,14 @@ GEN_PLOT_VARS = [
     ("gen_phi_HH",       r"Gen $\phi^{HH}$",                     30, -3.2,   3.2),
     ("gen_E_HH",         r"Gen $E^{HH}$ [GeV]",                  50,    0,  2000),
     ("gen_mHH",          r"Gen $m_{HH}$ [GeV]",                  50,  200,   800),
+    # -- τ charge misidentification (τ₁+τ₂ combined, keyed by true gen charge) --
+    # TauVsAll = TaumVsAll + TaupVsAll (charge-agnostic), range [0, 2]
+    ("gen_taum_TaumVsAll", r"Gen $\tau^-$ AK4 $\tau_h^-$ vs All (correct sign)",  25, 0, 1),
+    ("gen_taum_TaupVsAll", r"Gen $\tau^-$ AK4 $\tau_h^+$ vs All (wrong sign)",    25, 0, 1),
+    ("gen_taum_TauVsAll",  r"Gen $\tau^-$ AK4 $\tau_h$ vs All (combined)",         25, 0, 1),
+    ("gen_taup_TaupVsAll", r"Gen $\tau^+$ AK4 $\tau_h^+$ vs All (correct sign)",  25, 0, 1),
+    ("gen_taup_TaumVsAll", r"Gen $\tau^+$ AK4 $\tau_h^-$ vs All (wrong sign)",    25, 0, 1),
+    ("gen_taup_TauVsAll",  r"Gen $\tau^+$ AK4 $\tau_h$ vs All (combined)",         25, 0, 1),
 ]
 
 # 2D histograms (signal only, gen-matched AK8 tagger studies)
@@ -1097,21 +1196,23 @@ PLOT_VARS_2D = [
 
 # ── Filter variables if --plot-vars given ──
 if ARGS.plot_vars:
-    _all_var_names = {v[0] for v in PLOT_VARS}
+    _all_var_names = {v[0] for v in PLOT_VARS} | {v[0] for v in GEN_PLOT_VARS}
     PLOT_VARS = [v for v in PLOT_VARS
                  if any(fnmatch.fnmatch(v[0], p) for p in ARGS.plot_vars)]
-    _matched = {v[0] for v in PLOT_VARS}
+    GEN_PLOT_VARS = [v for v in GEN_PLOT_VARS
+                     if any(fnmatch.fnmatch(v[0], p) for p in ARGS.plot_vars)]
     _unknown = set()
     for p in ARGS.plot_vars:
         if not any(fnmatch.fnmatch(v, p) for v in _all_var_names):
             _unknown.add(p)
     if _unknown:
         print(f"WARNING: no variables matched patterns: {_unknown}")
-    if not PLOT_VARS:
+    if not PLOT_VARS and not GEN_PLOT_VARS:
         print("ERROR: --plot-vars matched no variables")
         sys.exit(1)
-    print(f"[--plot-vars] Plotting {len(PLOT_VARS)} variables: "
-          f"{', '.join(v[0] for v in PLOT_VARS)}")
+    print(f"[--plot-vars] Plotting {len(PLOT_VARS)} main vars, "
+          f"{len(GEN_PLOT_VARS)} gen vars: "
+          f"{', '.join(v[0] for v in PLOT_VARS + GEN_PLOT_VARS)}")
 
 
 def asimov_significance(S, B):
@@ -1138,7 +1239,8 @@ _cache_loaded = False
 if not ARGS.recache:
     _cached = load_hist_cache(_cache_path, _expected_meta, _trig_names)
     if _cached is not None:
-        mc_hists_by_trig, mc_denom_hists, mc_items_by_trig, LUMI, gen_hists_by_trig = _cached
+        (mc_hists_by_trig, mc_denom_hists, mc_items_by_trig, LUMI,
+         gen_hists_by_trig, mc_hists_excl_by_trig) = _cached
         # Build trig_selections with just the keys Phase 3 needs
         trig_selections = {}
         for trig_name, trig in TRIG_LIST:
@@ -1183,7 +1285,12 @@ if ARGS.skim or ARGS.reslim:
 
     # Also add trigger expressions (constructed at runtime, not in source literals)
     rdf_exprs.append(DST_JetHT_expr)
+    rdf_exprs.append(DST_MU_expr)
+    rdf_exprs.append(DST_EL_expr)
     rdf_exprs.append(PARKING_HH_expr)
+    for _, excl_expr in EXCL_TRIG_LIST:
+        if excl_expr is not None:
+            rdf_exprs.append(excl_expr)
 
     # Also add f-string expressions that reference AK8 branches (expanded at runtime)
     _AK8_skim = "ScoutingFatPFJetRecluster"
@@ -1409,21 +1516,48 @@ if not _cache_loaded:
                 h2d_book[pname].append((trig_name, s, ptr))
                 unified_ptrs.append(ptr)
 
-    # ── Phase 2c: Book gen-level Higgs histograms (signal only) ──
-    gen_histo_book = {}  # {trig_name: {var_name: [ptrs per sig sample]}}
+    # ── Phase 2c: Book gen-level histograms (signal only, split by decay channel) ──
+    gen_histo_book = {}  # {trig_name: {var_name: {mode: [ptrs per sig sample]}}}
     for trig_name in trig_selections:
         mc_sel_t = trig_selections[trig_name]["mc_sel"]
         gen_histo_book[trig_name] = {}
         for var_name, _xlabel, nbins, vmin, vmax in GEN_PLOT_VARS:
-            ptrs = []
-            for s in sig_samples:
-                uid = f"gen_{trig_name}_{var_name}_{s}"
-                ptr = mc_sel_t[s].Histo1D(
-                    (uid, f";{var_name};Events", nbins, vmin, vmax),
-                    var_name, "w")
-                ptrs.append(ptr)
-                unified_ptrs.append(ptr)
-            gen_histo_book[trig_name][var_name] = ptrs
+            gen_histo_book[trig_name][var_name] = {}
+            for mode in SIG_MODES:
+                ptrs = []
+                for s in sig_samples:
+                    uid = f"gen_{trig_name}_{var_name}_{s}_m{mode}"
+                    ptr = (mc_sel_t[s]
+                           .Filter(f"decayMode=={mode}")
+                           .Histo1D((uid, f";{var_name};Events", nbins, vmin, vmax),
+                                    var_name, "w"))
+                    ptrs.append(ptr)
+                    unified_ptrs.append(ptr)
+                gen_histo_book[trig_name][var_name][mode] = ptrs
+
+    # ── Phase 2d: Book exclusive-trigger MC histograms ──
+    _excl_histo_books = {}
+    for trig_name, trig in EXCL_TRIG_LIST:
+        if trig is not None:
+            mc_sel = {name: df.Filter(trig) for name, df in mc_acc.items()}
+        else:
+            mc_sel = dict(mc_acc)
+        mc_groups = _build_groups(mc_sel)
+        histo_book = {}
+        for var_name, _xlabel, nbins, vmin, vmax in PLOT_VARS:
+            histo_book[var_name] = []
+            for gi, (dfs, _lbl, _col) in enumerate(mc_groups):
+                group_ptrs = []
+                for si, df in enumerate(dfs):
+                    uid = f"excl_{trig_name}_{var_name}_{gi}_{si}"
+                    df_v = df.Filter(f"{var_name} > -0.5f") if var_name in _AK8_VARS else df
+                    ptr = df_v.Histo1D(
+                        (f"h_{uid}", f";{var_name};Events", nbins, vmin, vmax),
+                        var_name, "w")
+                    group_ptrs.append(ptr)
+                    unified_ptrs.append(ptr)
+                histo_book[var_name].append(group_ptrs)
+        _excl_histo_books[trig_name] = histo_book
 
     # ══════════════════════════════════════════════════════════════════════════════
     # Run ONE unified event loop for all Phase 1 + Phase 2 actions
@@ -1560,27 +1694,46 @@ if not _cache_loaded:
             h_by_var[var_name] = h_mc_list
         mc_hists_by_trig[trig_name] = h_by_var
 
-    # Gen-level Higgs histograms (signal only, combined across signal samples)
-    gen_hists_by_trig = {}  # {trig_name: {var_name: TH1D}}
+    # Gen-level histograms (signal only, split by decay channel)
+    gen_hists_by_trig = {}  # {trig_name: {var_name: {mode: TH1D}}}
     for trig_name in trig_selections:
         h_by_var = {}
         for var_name in gen_histo_book[trig_name]:
-            ptrs = gen_histo_book[trig_name][var_name]
-            combined = ptrs[0].GetValue().Clone(f"gen_{trig_name}_{var_name}")
-            for ptr in ptrs[1:]:
-                combined.Add(ptr.GetValue())
-            combined.Scale(LUMI)
-            h_by_var[var_name] = combined
+            h_by_mode = {}
+            for mode in SIG_MODES:
+                ptrs = gen_histo_book[trig_name][var_name][mode]
+                combined = ptrs[0].GetValue().Clone(f"gen_{trig_name}_{var_name}_m{mode}")
+                for ptr in ptrs[1:]:
+                    combined.Add(ptr.GetValue())
+                combined.Scale(LUMI)
+                h_by_mode[mode] = combined
+            h_by_var[var_name] = h_by_mode
         gen_hists_by_trig[trig_name] = h_by_var
+
+    # Exclusive-trigger histograms
+    mc_hists_excl_by_trig = {}
+    for trig_name, histo_book in _excl_histo_books.items():
+        h_by_var = {}
+        for var_name, group_list in histo_book.items():
+            h_mc_list = []
+            for gi, ptrs in enumerate(group_list):
+                combined = ptrs[0].GetValue().Clone()
+                for ptr in ptrs[1:]:
+                    combined.Add(ptr.GetValue())
+                combined.Scale(LUMI)
+                h_mc_list.append(combined)
+            h_by_var[var_name] = h_mc_list
+        mc_hists_excl_by_trig[trig_name] = h_by_var
 
     # ── Save histogram cache ──
     save_hist_cache(_cache_path, mc_hists_by_trig, mc_denom_hists,
                     mc_items_by_trig, LUMI, _expected_meta,
-                    gen_hists=gen_hists_by_trig)
+                    gen_hists=gen_hists_by_trig,
+                    excl_hists=mc_hists_excl_by_trig)
 
     # Drop lazy action pointers — they hold references to internal ROOT objects
     # that can cause double-free after RunGraphs with ImplicitMT.
-    del unified_ptrs, _histo_books, denom_book, gen_histo_book
+    del unified_ptrs, _histo_books, _excl_histo_books, denom_book, gen_histo_book
     if '_phase1_data' in dir():
         del _phase1_data
     import gc; gc.collect()
@@ -1703,7 +1856,7 @@ for trig_name in trig_selections:
 
     print(f"[{trig_name}] Phase 3: MC-only plots done")
 
-    # ── Gen-level Higgs plots (signal only) ──
+    # ── Gen-level plots (signal only, split by decay channel) ──
     if trig_name in gen_hists_by_trig:
         for var_name, xlabel, nbins, vmin, vmax in GEN_PLOT_VARS:
             gen_dir = os.path.join(PLOT_DIR, "mc", "shape", trig_name,
@@ -1713,19 +1866,33 @@ for trig_name in trig_selections:
             if os.path.exists(outpath) and not ARGS.overwrite:
                 print(f"Skipping (exists): {outpath}")
                 continue
-            h_gen = gen_hists_by_trig[trig_name][var_name]
-            if h_gen.GetEntries() == 0:
-                continue
-            edges, vals, errs = th1_to_np(h_gen)
+            h_by_mode = gen_hists_by_trig[trig_name][var_name]
             fig, ax = plt.subplots(figsize=(8, 6))
-            ax.step(edges, np.r_[vals, vals[-1]], where="post",
-                    linewidth=2, color="#4363d8",
-                    label=r"$HH \to bb\tau\tau$ SM (gen)")
-            ax.fill_between(edges, np.r_[vals - errs, (vals - errs)[-1]],
-                            np.r_[vals + errs, (vals + errs)[-1]],
-                            step="post", alpha=0.25, color="#4363d8")
+            has_entries = False
+            for mode in SIG_MODES:
+                h = h_by_mode.get(mode)
+                if h is None or h.GetEntries() == 0:
+                    continue
+                has_entries = True
+                edges, vals, errs = th1_to_np(h)
+                # Normalise to unit area (same logic as plot_trigger_shape_overlay)
+                area = float(np.sum(vals * np.diff(edges)))
+                if area > 0:
+                    vals = vals / area
+                    errs = errs / area
+                color = DECAY_MODES[mode]["color"]
+                label = DECAY_MODES[mode]["label"]
+                ax.step(edges, np.r_[vals, vals[-1]], where="post",
+                        linewidth=2, color=color, label=label)
+                ax.fill_between(edges,
+                                np.r_[vals - errs, (vals - errs)[-1]],
+                                np.r_[vals + errs, (vals + errs)[-1]],
+                                step="post", alpha=0.2, color=color)
+            if not has_entries:
+                plt.close(fig)
+                continue
             ax.set_xlabel(xlabel)
-            ax.set_ylabel("Events")
+            ax.set_ylabel("Normalised to unity")
             ax.set_xlim(vmin, vmax)
             ax.legend()
             ax.grid(True, alpha=0.3)
@@ -1792,6 +1959,103 @@ if do_shape:
             plt.close(fig)
 
     print("Phase 3.5: Trigger overlay plots done")
+
+    # ── Gen-level overlay: combined → overlay/gen/{var}.png ──
+    for var_name, xlabel, nbins, vmin, vmax in GEN_PLOT_VARS:
+        if not gen_hists_by_trig or var_name not in next(iter(gen_hists_by_trig.values()), {}):
+            continue
+        outpath = _plot_path("mc", "overlay", trig_name="gen", var_name=var_name)
+        if os.path.exists(outpath) and not ARGS.overwrite:
+            print(f"Skipping (exists): {outpath}")
+            continue
+        # Sum all decay modes into one TH1 per trigger (mirrors AK4 group-summing)
+        h_total_by_trig = {}
+        for trig_name in trig_selections:
+            h_by_mode = gen_hists_by_trig.get(trig_name, {}).get(var_name, {})
+            vals = list(h_by_mode.values())
+            if not vals:
+                continue
+            h_total = vals[0].Clone(f"_gen_ov_{trig_name}_{var_name}")
+            for h in vals[1:]:
+                h_total.Add(h)
+            h_total_by_trig[trig_name] = h_total
+        if h_total_by_trig:
+            fig, ax = plot_trigger_shape_overlay(h_total_by_trig)
+            ax.set_xlabel(xlabel)
+            cms_label(ax, lumi=LUMI)
+            fig.tight_layout()
+            fig.savefig(outpath, dpi=150)
+            print(f"Saved: {outpath}")
+            plt.close(fig)
+
+    # ── Gen-level overlay: per-channel → overlay/gen/{ch}_{var}.png ──
+    for var_name, xlabel, nbins, vmin, vmax in GEN_PLOT_VARS:
+        if not gen_hists_by_trig or var_name not in next(iter(gen_hists_by_trig.values()), {}):
+            continue
+        for mode in SIG_MODES:
+            ch_key = {20: "hh", 21: "hm", 22: "he"}.get(mode, str(mode))
+            outpath = _plot_path("mc", "overlay", trig_name="gen",
+                                 var_name=f"{ch_key}_{var_name}")
+            if os.path.exists(outpath) and not ARGS.overwrite:
+                print(f"Skipping (exists): {outpath}")
+                continue
+            h_by_trig = {}
+            for trig_name in trig_selections:
+                h = gen_hists_by_trig.get(trig_name, {}).get(var_name, {}).get(mode)
+                if h and h.GetEntries() > 0:
+                    h_by_trig[trig_name] = h
+            if h_by_trig:
+                fig, ax = plot_trigger_shape_overlay(
+                    h_by_trig, title=DECAY_MODES[mode]["label"])
+                ax.set_xlabel(xlabel)
+                cms_label(ax, lumi=LUMI)
+                fig.tight_layout()
+                fig.savefig(outpath, dpi=150)
+                print(f"Saved: {outpath}")
+                plt.close(fig)
+    print("Phase 3.5: Gen-level overlay plots done")
+
+    # ── Exclusive-trigger overlay: overlay_exclusive/{var}.png ──
+    if mc_hists_excl_by_trig:
+        for var_name, xlabel, nbins, vmin, vmax in PLOT_VARS:
+            outpath = _plot_path("mc", "overlay_exclusive", var_name=var_name)
+            if not os.path.exists(outpath) or ARGS.overwrite:
+                h_by_trig = {}
+                for trig_name, h_by_var in mc_hists_excl_by_trig.items():
+                    h_list = h_by_var.get(var_name, [])
+                    if not h_list:
+                        continue
+                    h_total = h_list[0].Clone(f"_exclov_{trig_name}_{var_name}")
+                    for h in h_list[1:]:
+                        h_total.Add(h)
+                    h_by_trig[trig_name] = h_total
+                if h_by_trig:
+                    fig, ax = plot_trigger_shape_overlay(h_by_trig)
+                    ax.set_xlabel(xlabel)
+                    cms_label(ax, lumi=LUMI)
+                    fig.tight_layout()
+                    fig.savefig(outpath, dpi=150)
+                    plt.close(fig)
+        # Per-channel exclusive overlay
+        for var_name, xlabel, nbins, vmin, vmax in PLOT_VARS:
+            for gi, ch_key, ch_label in SIG_CHANNELS:
+                outpath = _plot_path("mc", "overlay_exclusive",
+                                     var_name=f"{ch_key}_{var_name}")
+                if os.path.exists(outpath) and not ARGS.overwrite:
+                    continue
+                h_by_trig = {}
+                for trig_name, h_by_var in mc_hists_excl_by_trig.items():
+                    h_list = h_by_var.get(var_name, [])
+                    if gi < len(h_list):
+                        h_by_trig[trig_name] = h_list[gi]
+                if h_by_trig:
+                    fig, ax = plot_trigger_shape_overlay(h_by_trig, title=ch_label)
+                    ax.set_xlabel(xlabel)
+                    cms_label(ax, lumi=LUMI)
+                    fig.tight_layout()
+                    fig.savefig(outpath, dpi=150)
+                    plt.close(fig)
+        print("Phase 3.5: Exclusive-trigger overlay plots done")
 
     # ── Phase 3.6: 2D gen-matched plots (signal only) ──
     for pname, _xvar, _yvar, xlabel, ylabel, *_ in PLOT_VARS_2D:
