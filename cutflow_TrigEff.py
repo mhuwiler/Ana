@@ -181,7 +181,7 @@ def _cache_meta(max_files, plot_vars_names):
 
 
 def save_hist_cache(cache_path, mc_hists_by_trig, mc_denom_hists,
-                    mc_items_by_trig, lumi, meta):
+                    mc_items_by_trig, lumi, meta, gen_hists=None):
     """Save all materialized TH1 objects to a ROOT file."""
     import json
     tf = ROOT.TFile.Open(cache_path, "RECREATE")
@@ -210,6 +210,15 @@ def save_hist_cache(cache_path, mc_hists_by_trig, mc_denom_hists,
             tf.cd(dname)
             for gi, h in enumerate(h_list):
                 h.Write(f"g{gi}")
+
+    # Save gen-level Higgs histograms (signal only)
+    if gen_hists:
+        for trig_name, h_by_var in gen_hists.items():
+            for var_name, h in h_by_var.items():
+                dname = f"gen/{trig_name}/{var_name}"
+                tf.mkdir(dname)
+                tf.cd(dname)
+                h.Write("h")
 
     tf.Close()
     sz = os.path.getsize(cache_path) / 1e6
@@ -287,8 +296,24 @@ def load_hist_cache(cache_path, expected_meta, trig_names):
             h_by_var[var_name] = h_list
         mc_hists_by_trig[trig_name] = h_by_var
 
+    # Load gen-level Higgs histograms (signal only)
+    gen_hists_by_trig = {}
+    gen_top = tf.Get("gen")
+    if gen_top:
+        for trig_key in gen_top.GetListOfKeys():
+            trig_name = trig_key.GetName()
+            trig_dir = tf.Get(f"gen/{trig_name}")
+            h_by_var = {}
+            for var_key in trig_dir.GetListOfKeys():
+                var_name = var_key.GetName()
+                var_dir = tf.Get(f"gen/{trig_name}/{var_name}")
+                h = var_dir.Get("h").Clone()
+                h.SetDirectory(0)
+                h_by_var[var_name] = h
+            gen_hists_by_trig[trig_name] = h_by_var
+
     tf.Close()
-    return mc_hists_by_trig, mc_denom_hists, mc_items_by_trig, lumi
+    return mc_hists_by_trig, mc_denom_hists, mc_items_by_trig, lumi, gen_hists_by_trig
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -494,6 +519,18 @@ for name in sig_samples:
         .Define("gen_pt_Htautau",   "genHtautau_p4.Pt()")
         .Define("gen_eta_Hbb",      "genHbb_p4.Eta()")
         .Define("gen_eta_Htautau",  "genHtautau_p4.Eta()")
+        .Define("gen_phi_Hbb",      "genHbb_p4.Phi()")
+        .Define("gen_phi_Htautau",  "genHtautau_p4.Phi()")
+        .Define("gen_E_Hbb",        "genHbb_p4.E()")
+        .Define("gen_E_Htautau",    "genHtautau_p4.E()")
+        .Define("gen_mass_Hbb",     "genHbb_p4.M()")
+        .Define("gen_mass_Htautau", "genHtautau_p4.M()")
+        .Define("gen_dR_H1H2",     "genHbb_p4.DeltaR(genHtautau_p4)")
+        .Define("gen_HH_p4",       "genHbb_p4 + genHtautau_p4")
+        .Define("gen_pt_HH",       "gen_HH_p4.Pt()")
+        .Define("gen_eta_HH",      "gen_HH_p4.Eta()")
+        .Define("gen_phi_HH",      "gen_HH_p4.Phi()")
+        .Define("gen_E_HH",        "gen_HH_p4.E()")
     )
     # -- Gen-match AK8 jets to gen H→bb and H→ττ --
     mc[name] = (mc[name]
@@ -646,7 +683,14 @@ def define_kinematics(df):
     # ak4_BvsAll   = probb / (probb + probc + probg + probuds + problepb + probtaum + probtaup)
     # Sort jets by BvsAll in descending order; [0] = highest, [1] = second-highest
     df = (df
-        .Define("upart_b_raw", f"{_AK4}_scoutUParT_probb")
+        .Define("upart_b_raw",    f"{_AK4}_scoutUParT_probb")
+        .Define("upart_taup_raw", f"{_AK4}_scoutUParT_probtaup")
+        .Define("upart_taum_raw", f"{_AK4}_scoutUParT_probtaum")
+        .Define("upart_tau_raw",  f"{_AK4}_scoutUParT_probtaup + {_AK4}_scoutUParT_probtaum")
+        .Define("upart_c_raw",    f"{_AK4}_scoutUParT_probc")
+        .Define("upart_g_raw",    f"{_AK4}_scoutUParT_probg")
+        .Define("upart_uds_raw",  f"{_AK4}_scoutUParT_probuds")
+        .Define("upart_lepb_raw", f"{_AK4}_scoutUParT_problepb")
         .Define("ak4_BvsAll",
                 f"{_AK4}_scoutUParT_probb"
                 f" / ({_AK4}_scoutUParT_probb"
@@ -661,6 +705,12 @@ def define_kinematics(df):
                 f" + {_AK4}_scoutUParT_probtaum + {_AK4}_scoutUParT_probtaup)")
         .Define("ak4_TaumVsAll",
                 f"{_AK4}_scoutUParT_probtaum"
+                f" / ({_AK4}_scoutUParT_probb"
+                f" + {_AK4}_scoutUParT_probc + {_AK4}_scoutUParT_probg"
+                f" + {_AK4}_scoutUParT_probuds + {_AK4}_scoutUParT_problepb"
+                f" + {_AK4}_scoutUParT_probtaum + {_AK4}_scoutUParT_probtaup)")
+        .Define("ak4_TauVsAll",
+                f"({_AK4}_scoutUParT_probtaup + {_AK4}_scoutUParT_probtaum)"
                 f" / ({_AK4}_scoutUParT_probb"
                 f" + {_AK4}_scoutUParT_probc + {_AK4}_scoutUParT_probg"
                 f" + {_AK4}_scoutUParT_probuds + {_AK4}_scoutUParT_problepb"
@@ -735,8 +785,8 @@ _AK4_GM = "ScoutingPFJetRecluster2"
 _ak4_gen_particles = [
     ("b1",   "gen_HH.b1",   "BvsAll"),
     ("b2",   "gen_HH.b2",   "BvsAll"),
-    ("tau1", "gen_HH.tau1", "TaupVsAll"),
-    ("tau2", "gen_HH.tau2", "TaupVsAll"),
+    ("tau1", "gen_HH.tau1", "TauVsAll"),
+    ("tau2", "gen_HH.tau2", "TauVsAll"),
 ]
 _ak4_gen_cols = []
 for _gp_label, _gp_expr, _score_name in _ak4_gen_particles:
@@ -765,10 +815,45 @@ for name in sig_samples:
                     f"{_idx} >= 0 ? ak4_{_score_name}[{_idx}] : -1.f")
         )
 
+# Additional tau scores (TaumVsAll, TaupVsAll) using existing gen-matched indices
+_ak4_gen_tau_extra = []
+for _tl in ["tau1", "tau2"]:
+    for _sc in ["TaumVsAll", "TaupVsAll"]:
+        _ak4_gen_tau_extra.append(f"ak4_gen{_tl}_{_sc}")
+for name in sig_samples:
+    for _tl in ["tau1", "tau2"]:
+        _idx = f"ak4_gen{_tl}_idx"
+        mc[name] = (mc[name]
+            .Define(f"ak4_gen{_tl}_TaumVsAll", f"{_idx} >= 0 ? ak4_TaumVsAll[{_idx}] : -1.f")
+            .Define(f"ak4_gen{_tl}_TaupVsAll", f"{_idx} >= 0 ? ak4_TaupVsAll[{_idx}] : -1.f")
+        )
+
+# Raw UParT prob scores for gen-matched jets
+_raw_scores = [
+    ("raw_b",    "upart_b_raw"),
+    ("raw_taup", "upart_taup_raw"),
+    ("raw_taum", "upart_taum_raw"),
+    ("raw_tau",  "upart_tau_raw"),
+    ("raw_c",    "upart_c_raw"),
+    ("raw_g",    "upart_g_raw"),
+    ("raw_uds",  "upart_uds_raw"),
+    ("raw_lepb", "upart_lepb_raw"),
+]
+_ak4_gen_raw_cols = []
+for name in sig_samples:
+    for _gp_label in ["b1", "b2", "tau1", "tau2"]:
+        _idx = f"ak4_gen{_gp_label}_idx"
+        for _score_suffix, _vec_name in _raw_scores:
+            col = f"ak4_gen{_gp_label}_{_score_suffix}"
+            mc[name] = mc[name].Define(col, f"{_idx} >= 0 ? {_vec_name}[{_idx}] : -1.f")
+            if col not in _ak4_gen_raw_cols:
+                _ak4_gen_raw_cols.append(col)
+
 # Dummy AK4 gen-match columns for non-signal samples
+_all_ak4_gen_cols = _ak4_gen_cols + _ak4_gen_tau_extra + _ak4_gen_raw_cols
 for name in mc:
     if name not in sig_samples:
-        for col in _ak4_gen_cols:
+        for col in _all_ak4_gen_cols:
             mc[name] = mc[name].Define(col, "-1.f")
 
 # ── Load and apply user cuts from config/cuts.yaml ──
@@ -829,9 +914,7 @@ CUTFLOW_STEPS = [
     ("Trigger",                       None),
     ("≥4 jets",                       "nScoutingPFJetRecluster2 >= 4"),
     ("4 jets pT > 20",                "ak4_pt0 > 20 && ak4_pt1 > 20 && ak4_pt2 > 20 && ak4_pt3 > 20"),
-    (f"2 b-tag (BvsAll > {BTAG_WP})", f"b0_score > {BTAG_WP} && b1_score > {BTAG_WP}"),
-    ("H→bb cand (m_jj ∈ [100,150])",  "has_hbb"),
-    ("H→ττ cand (m_jj ∈ [40,150])",   "has_hbb && has_htautau"),
+    # TODO: add UParT-based b-tag and tau-tag cuts after gen-matched score study
 ]
 
 PLOT_VARS = [
@@ -924,10 +1007,71 @@ PLOT_VARS = [
     ("ak4_genb1_BvsAll",     r"Gen-matched $b_1$ AK4 UParT BvsAll",         25, 0, 1),
     ("ak4_genb2_dR",         r"$\Delta R$(gen $b_2$, AK4)",                  25, 0, 0.5),
     ("ak4_genb2_BvsAll",     r"Gen-matched $b_2$ AK4 UParT BvsAll",         25, 0, 1),
-    ("ak4_gentau1_dR",       r"$\Delta R$(gen $\tau_1$, AK4)",               25, 0, 0.5),
-    ("ak4_gentau1_TaupVsAll", r"Gen-matched $\tau_1$ AK4 UParT TaupVsAll",  25, 0, 1),
-    ("ak4_gentau2_dR",       r"$\Delta R$(gen $\tau_2$, AK4)",               25, 0, 0.5),
-    ("ak4_gentau2_TaupVsAll", r"Gen-matched $\tau_2$ AK4 UParT TaupVsAll",  25, 0, 1),
+    ("ak4_gentau1_dR",       r"$\Delta R$(gen $\tau_1$, AK4)",              25, 0, 0.5),
+    ("ak4_gentau1_TauVsAll",  r"Gen-matched $\tau_1$ AK4 UParT TauVsAll",          25, 0, 1),
+    ("ak4_gentau1_TaumVsAll", r"Gen-matched $\tau_1$ AK4 UParT $\tau_\mu$ VsAll", 25, 0, 1),
+    ("ak4_gentau1_TaupVsAll", r"Gen-matched $\tau_1$ AK4 UParT $\tau_h$ VsAll",   25, 0, 1),
+    ("ak4_gentau2_dR",        r"$\Delta R$(gen $\tau_2$, AK4)",                    25, 0, 0.5),
+    ("ak4_gentau2_TauVsAll",  r"Gen-matched $\tau_2$ AK4 UParT TauVsAll",          25, 0, 1),
+    ("ak4_gentau2_TaumVsAll", r"Gen-matched $\tau_2$ AK4 UParT $\tau_\mu$ VsAll", 25, 0, 1),
+    ("ak4_gentau2_TaupVsAll", r"Gen-matched $\tau_2$ AK4 UParT $\tau_h$ VsAll",   25, 0, 1),
+    # -- Gen-matched raw UParT probs --
+    ("ak4_genb1_raw_b",       r"Gen-matched $b_1$ AK4 raw prob\_b",               25, 0, 1),
+    ("ak4_genb2_raw_b",       r"Gen-matched $b_2$ AK4 raw prob\_b",               25, 0, 1),
+    ("ak4_gentau1_raw_b",     r"Gen-matched $\tau_1$ AK4 raw prob\_b",             25, 0, 1),
+    ("ak4_gentau1_raw_taup",  r"Gen-matched $\tau_1$ AK4 raw prob $\tau_h^+$",    25, 0, 1),
+    ("ak4_gentau1_raw_taum",  r"Gen-matched $\tau_1$ AK4 raw prob $\tau_h^-$",    25, 0, 1),
+    ("ak4_gentau1_raw_tau",   r"Gen-matched $\tau_1$ AK4 raw prob $\tau$ (p+m)",  25, 0, 1),
+    ("ak4_gentau2_raw_b",     r"Gen-matched $\tau_2$ AK4 raw prob\_b",             25, 0, 1),
+    ("ak4_gentau2_raw_taup",  r"Gen-matched $\tau_2$ AK4 raw prob $\tau_h^+$",    25, 0, 1),
+    ("ak4_gentau2_raw_taum",  r"Gen-matched $\tau_2$ AK4 raw prob $\tau_h^-$",    25, 0, 1),
+    ("ak4_gentau2_raw_tau",   r"Gen-matched $\tau_2$ AK4 raw prob $\tau$ (p+m)",  25, 0, 1),
+    ("ak4_genb1_raw_taup",    r"Gen-matched $b_1$ AK4 raw prob $\tau_h^+$",       25, 0, 1),
+    ("ak4_genb1_raw_taum",    r"Gen-matched $b_1$ AK4 raw prob $\tau_h^-$",       25, 0, 1),
+    ("ak4_genb1_raw_tau",     r"Gen-matched $b_1$ AK4 raw prob $\tau$ (p+m)",     25, 0, 1),
+    ("ak4_genb2_raw_taup",    r"Gen-matched $b_2$ AK4 raw prob $\tau_h^+$",       25, 0, 1),
+    ("ak4_genb2_raw_taum",    r"Gen-matched $b_2$ AK4 raw prob $\tau_h^-$",       25, 0, 1),
+    ("ak4_genb2_raw_tau",     r"Gen-matched $b_2$ AK4 raw prob $\tau$ (p+m)",     25, 0, 1),
+    # -- Gen-matched raw UParT probs (c, g, uds, lepb) --
+    ("ak4_genb1_raw_c",       r"Gen-matched $b_1$ AK4 raw prob\_c",               25, 0, 1),
+    ("ak4_genb1_raw_g",       r"Gen-matched $b_1$ AK4 raw prob\_g",               25, 0, 1),
+    ("ak4_genb1_raw_uds",     r"Gen-matched $b_1$ AK4 raw prob\_uds",             25, 0, 1),
+    ("ak4_genb1_raw_lepb",    r"Gen-matched $b_1$ AK4 raw prob\_lepb",            25, 0, 1),
+    ("ak4_genb2_raw_c",       r"Gen-matched $b_2$ AK4 raw prob\_c",               25, 0, 1),
+    ("ak4_genb2_raw_g",       r"Gen-matched $b_2$ AK4 raw prob\_g",               25, 0, 1),
+    ("ak4_genb2_raw_uds",     r"Gen-matched $b_2$ AK4 raw prob\_uds",             25, 0, 1),
+    ("ak4_genb2_raw_lepb",    r"Gen-matched $b_2$ AK4 raw prob\_lepb",            25, 0, 1),
+    ("ak4_gentau1_raw_c",     r"Gen-matched $\tau_1$ AK4 raw prob\_c",            25, 0, 1),
+    ("ak4_gentau1_raw_g",     r"Gen-matched $\tau_1$ AK4 raw prob\_g",            25, 0, 1),
+    ("ak4_gentau1_raw_uds",   r"Gen-matched $\tau_1$ AK4 raw prob\_uds",          25, 0, 1),
+    ("ak4_gentau1_raw_lepb",  r"Gen-matched $\tau_1$ AK4 raw prob\_lepb",         25, 0, 1),
+    ("ak4_gentau2_raw_c",     r"Gen-matched $\tau_2$ AK4 raw prob\_c",            25, 0, 1),
+    ("ak4_gentau2_raw_g",     r"Gen-matched $\tau_2$ AK4 raw prob\_g",            25, 0, 1),
+    ("ak4_gentau2_raw_uds",   r"Gen-matched $\tau_2$ AK4 raw prob\_uds",          25, 0, 1),
+    ("ak4_gentau2_raw_lepb",  r"Gen-matched $\tau_2$ AK4 raw prob\_lepb",         25, 0, 1),
+]
+
+# Gen-level Higgs plots (signal only, no trigger dependence at gen level)
+# (branch, xlabel, nbins, xmin, xmax)
+GEN_PLOT_VARS = [
+    # -- Per-Higgs kinematics --
+    ("gen_pt_Hbb",       r"Gen $H \to bb$ $p_T$ [GeV]",          50,    0,   500),
+    ("gen_pt_Htautau",   r"Gen $H \to \tau\tau$ $p_T$ [GeV]",    50,    0,   500),
+    ("gen_eta_Hbb",      r"Gen $H \to bb$ $\eta$",               30,   -5,     5),
+    ("gen_eta_Htautau",  r"Gen $H \to \tau\tau$ $\eta$",         30,   -5,     5),
+    ("gen_phi_Hbb",      r"Gen $H \to bb$ $\phi$",               30, -3.2,   3.2),
+    ("gen_phi_Htautau",  r"Gen $H \to \tau\tau$ $\phi$",         30, -3.2,   3.2),
+    ("gen_E_Hbb",        r"Gen $H \to bb$ Energy [GeV]",         50,    0,  1000),
+    ("gen_E_Htautau",    r"Gen $H \to \tau\tau$ Energy [GeV]",   50,    0,  1000),
+    ("gen_mass_Hbb",     r"Gen $H \to bb$ mass [GeV]",           50,  100,   150),
+    ("gen_mass_Htautau", r"Gen $H \to \tau\tau$ mass [GeV]",     50,    0,   150),
+    # -- Di-Higgs system --
+    ("gen_dR_H1H2",      r"Gen $\Delta R(H_{bb}, H_{\tau\tau})$", 30,   0,     6),
+    ("gen_pt_HH",        r"Gen $p_T^{HH}$ [GeV]",               50,    0,   500),
+    ("gen_eta_HH",       r"Gen $\eta^{HH}$",                     30,   -5,     5),
+    ("gen_phi_HH",       r"Gen $\phi^{HH}$",                     30, -3.2,   3.2),
+    ("gen_E_HH",         r"Gen $E^{HH}$ [GeV]",                  50,    0,  2000),
+    ("gen_mHH",          r"Gen $m_{HH}$ [GeV]",                  50,  200,   800),
 ]
 
 # 2D histograms (signal only, gen-matched AK8 tagger studies)
@@ -994,7 +1138,7 @@ _cache_loaded = False
 if not ARGS.recache:
     _cached = load_hist_cache(_cache_path, _expected_meta, _trig_names)
     if _cached is not None:
-        mc_hists_by_trig, mc_denom_hists, mc_items_by_trig, LUMI = _cached
+        mc_hists_by_trig, mc_denom_hists, mc_items_by_trig, LUMI, gen_hists_by_trig = _cached
         # Build trig_selections with just the keys Phase 3 needs
         trig_selections = {}
         for trig_name, trig in TRIG_LIST:
@@ -1265,6 +1409,22 @@ if not _cache_loaded:
                 h2d_book[pname].append((trig_name, s, ptr))
                 unified_ptrs.append(ptr)
 
+    # ── Phase 2c: Book gen-level Higgs histograms (signal only) ──
+    gen_histo_book = {}  # {trig_name: {var_name: [ptrs per sig sample]}}
+    for trig_name in trig_selections:
+        mc_sel_t = trig_selections[trig_name]["mc_sel"]
+        gen_histo_book[trig_name] = {}
+        for var_name, _xlabel, nbins, vmin, vmax in GEN_PLOT_VARS:
+            ptrs = []
+            for s in sig_samples:
+                uid = f"gen_{trig_name}_{var_name}_{s}"
+                ptr = mc_sel_t[s].Histo1D(
+                    (uid, f";{var_name};Events", nbins, vmin, vmax),
+                    var_name, "w")
+                ptrs.append(ptr)
+                unified_ptrs.append(ptr)
+            gen_histo_book[trig_name][var_name] = ptrs
+
     # ══════════════════════════════════════════════════════════════════════════════
     # Run ONE unified event loop for all Phase 1 + Phase 2 actions
     # ══════════════════════════════════════════════════════════════════════════════
@@ -1400,13 +1560,27 @@ if not _cache_loaded:
             h_by_var[var_name] = h_mc_list
         mc_hists_by_trig[trig_name] = h_by_var
 
+    # Gen-level Higgs histograms (signal only, combined across signal samples)
+    gen_hists_by_trig = {}  # {trig_name: {var_name: TH1D}}
+    for trig_name in trig_selections:
+        h_by_var = {}
+        for var_name in gen_histo_book[trig_name]:
+            ptrs = gen_histo_book[trig_name][var_name]
+            combined = ptrs[0].GetValue().Clone(f"gen_{trig_name}_{var_name}")
+            for ptr in ptrs[1:]:
+                combined.Add(ptr.GetValue())
+            combined.Scale(LUMI)
+            h_by_var[var_name] = combined
+        gen_hists_by_trig[trig_name] = h_by_var
+
     # ── Save histogram cache ──
     save_hist_cache(_cache_path, mc_hists_by_trig, mc_denom_hists,
-                    mc_items_by_trig, LUMI, _expected_meta)
+                    mc_items_by_trig, LUMI, _expected_meta,
+                    gen_hists=gen_hists_by_trig)
 
     # Drop lazy action pointers — they hold references to internal ROOT objects
     # that can cause double-free after RunGraphs with ImplicitMT.
-    del unified_ptrs, _histo_books, denom_book
+    del unified_ptrs, _histo_books, denom_book, gen_histo_book
     if '_phase1_data' in dir():
         del _phase1_data
     import gc; gc.collect()
@@ -1528,6 +1702,38 @@ for trig_name in trig_selections:
                 plt.close(fig)
 
     print(f"[{trig_name}] Phase 3: MC-only plots done")
+
+    # ── Gen-level Higgs plots (signal only) ──
+    if trig_name in gen_hists_by_trig:
+        for var_name, xlabel, nbins, vmin, vmax in GEN_PLOT_VARS:
+            gen_dir = os.path.join(PLOT_DIR, "mc", "shape", trig_name,
+                                   "gen", "HBBTT_SM")
+            os.makedirs(gen_dir, exist_ok=True)
+            outpath = os.path.join(gen_dir, f"{var_name}.png")
+            if os.path.exists(outpath) and not ARGS.overwrite:
+                print(f"Skipping (exists): {outpath}")
+                continue
+            h_gen = gen_hists_by_trig[trig_name][var_name]
+            if h_gen.GetEntries() == 0:
+                continue
+            edges, vals, errs = th1_to_np(h_gen)
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.step(edges, np.r_[vals, vals[-1]], where="post",
+                    linewidth=2, color="#4363d8",
+                    label=r"$HH \to bb\tau\tau$ SM (gen)")
+            ax.fill_between(edges, np.r_[vals - errs, (vals - errs)[-1]],
+                            np.r_[vals + errs, (vals + errs)[-1]],
+                            step="post", alpha=0.25, color="#4363d8")
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel("Events")
+            ax.set_xlim(vmin, vmax)
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            cms_label(ax, lumi=LUMI)
+            fig.tight_layout()
+            fig.savefig(outpath, dpi=150)
+            print(f"Saved: {outpath}")
+            plt.close(fig)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

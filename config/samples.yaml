@@ -29,6 +29,6 @@ groups:
   HHbbtt:
     GluGluHHto2B2Tau_Par-c2-0p00-kl-1p00-kt-1p00_TuneCP5_13p6TeV_powheg-pythia8:
       base_dir: /eos/purdue/store/user/arghyara/production/Scouting/NanoAODv16Scouting24/mcscouting_2024
-      dataset_tag: null
+      dataset_tag: "RunIII2024Summer24MiniAODv6-PowhegBugFix_150X_mcRun3_2024_realistic_v2_ext1-v2_DAZSLE_PFNano"
       production_id: "260322_000108"
       xsec_pb: 0.002506
