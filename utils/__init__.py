@@ -5,9 +5,6 @@ from .data import (
     das_files,
     load_scouting_data,
     load_config,
-    dropBranchNames,
-    WriteFile,
-    generalise,
     BASE,
     DY,
     TT,
@@ -39,13 +36,12 @@ from .triggers import (
 
 from .plotting import (
     th1_to_np,
-    teff_to_np,
-    plot_trigger_eff_overlay_channels,
-    plot_yield_overlay,
-    plot_stacked_all_mc,
-    plot_stacked_from_hists,
-    plot_shape_from_hists,
+    plot_stacked,
+    plot_shape,
     plot_stacked_with_efficiency,
     plot_stacked_with_significance,
+    plot_trigger_shape_overlay,
+    plot_2d_hist,
     setup_style,
+    cms_label,
 )

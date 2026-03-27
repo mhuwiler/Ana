@@ -4,7 +4,6 @@ Data loading utilities for scouting NanoAOD analysis.
 Handles:
   - Local filesystem NanoAOD file discovery (ls_nanoaod_files_*)
   - XCache / DAS-based scouting data loading
-  - RDataFrame helper functions (dropBranchNames, WriteFile, generalise)
   - Sample definitions and constants
 """
 
@@ -502,31 +501,3 @@ def extract_lumi(run_take, ls_take, brilcalc_data):
 
     data_runs = sorted(run_ls_count.keys())
     return lumi, data_runs, n_missing
-
-
-# ---------------------------------------------------------------------------
-# RDataFrame helpers
-# ---------------------------------------------------------------------------
-
-def dropBranchNames(frame, filename, exclusionlist=None):
-    """
-    Write column (branch) names from an RDataFrame to a text file,
-    excluding branches containing substrings in exclusionlist.
-    """
-    if exclusionlist is None:
-        exclusionlist = []
-    from ROOT import Ana
-    with open(filename, "w") as file:
-        for name in frame.GetColumnNames():
-            name = str(name)
-            if not any(excluded in name for excluded in exclusionlist):
-                file.write(f"{name}\n")
-
-
-def WriteFile(sample, filename, blacklist, treename="Events"):
-    from ROOT import Ana
-    sample.Snapshot(treename, filename, Ana.purgeColumns(sample.GetColumnNames(), blacklist))
-
-
-def generalise(df):
-    return ROOT.ROOT.RDF.AsRNode(df)

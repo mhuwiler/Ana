@@ -44,15 +44,6 @@ struct DijetPair {
     bool  found() const { return i1 >= 0 && i2 >= 0; }
 };
 
-// Shared: opposite-sign same-flavour dilepton pair
-struct DileptonPair {
-    int   i1         = -1;   // index of lepton 1 in collection
-    int   i2         = -1;   // index of lepton 2 in collection
-    float mass       = -1.f; // invariant mass [GeV]
-    int   charge_sum = 99;   // i1.charge + i2.charge (0 for OS pair)
-    bool  found() const { return i1 >= 0 && i2 >= 0; }
-};
-
 // DY: gen-level Z boson decay classification
 // decayMode:
 //   0 = unknown / not found
@@ -149,16 +140,6 @@ inline TLorentzVector getP4(int idx,
         v.SetPtEtaPhiM(pt[idx], eta[idx], phi[idx], mass[idx]);
     }
     return v;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Safe array access
-// ─────────────────────────────────────────────────────────────────────────────
-
-template<typename T>
-inline T safeAt(const ROOT::RVec<T>& v, int idx, T fallback = T{}) {
-    if (idx >= 0 && idx < (int)v.size()) return v[idx];
-    return fallback;
 }
 
 } // namespace Ana
