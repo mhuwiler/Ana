@@ -18,8 +18,3 @@ decay_modes:
 
 bkg_modes: [1, 2, 3, 4, 5, 10, 11, 12, 30]
 sig_modes: [20, 21, 22]
-
-cutflow_steps:
-  - ["Trigger",                null]
-  - ["≥4 jets",                "nScoutingPFJetRecluster2 >= 4"]
-  - ["4 jets pT > 20",         "ak4_pt0 > 20 && ak4_pt1 > 20 && ak4_pt2 > 20 && ak4_pt3 > 20"]

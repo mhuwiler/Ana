@@ -43,6 +43,7 @@ class AnalysisContext:
     theme: str
     overwrite: bool
     max_mc_files: int             # 0 = use MAX_EVENTS limit
+    max_data_files: int           # 0 = all data files
     max_events: object            # None = use default from samples.yaml
     cuts: object                  # None = use cuts.yaml, [] = no cuts, [...] = custom
     ana_dir: str                  # repo root directory
@@ -54,7 +55,7 @@ class AnalysisContext:
 
 def setup(script_file, samples, triggers=None, data=True,
           nthreads=4, nplot_workers=8, theme="light", overwrite=False,
-          max_mc_files=0, max_events=None, cuts=None):
+          max_mc_files=0, max_data_files=0, max_events=None, cuts=None):
     """One-line framework init. Returns AnalysisContext.
 
     Parameters
@@ -93,9 +94,16 @@ def setup(script_file, samples, triggers=None, data=True,
     ana_cfg = load_analysis_config()
     trig_list_all, excl_trig_list_all, brilcalc_files, brilcalc_fallback = load_triggers()
 
-    # Filter triggers to user's selection
+    # Extract triggers — from CUTS tuple format or explicit TRIGGERS list
     if triggers is not None:
         _trigger_set = set(triggers)
+    elif isinstance(cuts, list) and cuts and isinstance(cuts[0], tuple):
+        # Extract unique trigger names from CUTS tuples
+        _trigger_set = set(trig for trig, _ in cuts)
+    else:
+        _trigger_set = None
+
+    if _trigger_set is not None:
         trig_list = [(n, e) for n, e in trig_list_all if n in _trigger_set]
         excl_trig_list = [(n, e) for n, e in excl_trig_list_all
                           if n.replace("_excl", "") in _trigger_set]
@@ -142,6 +150,7 @@ def setup(script_file, samples, triggers=None, data=True,
         theme=theme,
         overwrite=overwrite,
         max_mc_files=max_mc_files,
+        max_data_files=max_data_files,
         max_events=max_events,
         cuts=cuts,
         ana_dir=ana_dir,
@@ -194,8 +203,7 @@ def load_and_run(ctx, plot_vars, vars_2d=None, cm_2d=None):
         max_mc_files=ctx.max_mc_files,
         all_events=False,
         no_data=not ctx.data,
-        max_data_files=0,
-        skip_cutflow=True,
+        max_data_files=ctx.max_data_files,
     )
 
     # Load MC
@@ -204,20 +212,12 @@ def load_and_run(ctx, plot_vars, vars_2d=None, cm_2d=None):
     max_events = ctx.max_events if ctx.max_events is not None else MAX_EVENTS
     print(f"\nPreparing MC weights  MAX_EVENTS = {max_events}")
     mc, mc_files_map, dy_samples, tt_samples, sig_samples, qcd_samples = load_mc_samples(
-        group_files_by_sample, XSEC, max_events, args, rdf_exprs=rdf_exprs,
-        cuts=ctx.cuts)
+        group_files_by_sample, XSEC, max_events, args, rdf_exprs=rdf_exprs)
 
     # Load data
     data_df, lumi_precomputed = load_data(
         args, brilcalc_default=ctx.brilcalc_default,
         data_years=DATA_YEARS, data_runs=DATA_RUNS)
-
-    # Apply same cuts to data
-    if data_df is not None:
-        from analysis.data_loading import resolve_cuts
-        data_cuts, _ = resolve_cuts(ctx.cuts)
-        for _, cut_expr in data_cuts:
-            data_df = data_df.Filter(cut_expr)
 
     # Convert vars_2d tuples to PlotVar2D for backwards compat with book_2d_histograms
     plot_vars_2d = []
@@ -245,6 +245,30 @@ def load_and_run(ctx, plot_vars, vars_2d=None, cm_2d=None):
                     cm_var_names.add(vname)
                     plot_vars = list(plot_vars) + [PlotVar(vname, var_def[1], var_def[2], var_def[3], var_def[4])]
 
+    # Build per-trigger cut map from CUTS
+    from analysis.data_loading import resolve_cuts
+
+    cuts_by_trig = {}  # {trig_name: [(cut_name, expr), ...]}
+    if isinstance(ctx.cuts, list) and ctx.cuts and isinstance(ctx.cuts[0], tuple):
+        # New tuple format: [("NoTrigger", ["common", "tauhtauh"]), ...]
+        for trig_name, cut_cards in ctx.cuts:
+            named_cuts, _src = resolve_cuts(cut_cards)
+            cuts_by_trig[trig_name] = named_cuts
+            print(f"\n[cuts] {trig_name}: {len(named_cuts)} cuts from {_src}")
+            for cut_name, cut_expr in named_cuts:
+                tag = f"{cut_name}: " if cut_name else ""
+                print(f"  \u2192 {tag}{cut_expr}")
+    else:
+        # Old flat format — same cuts for all triggers
+        named_cuts, _src = resolve_cuts(ctx.cuts)
+        if named_cuts:
+            print(f"\n[cuts] Applying {len(named_cuts)} cuts from {_src}:")
+            for cut_name, cut_expr in named_cuts:
+                tag = f"{cut_name}: " if cut_name else ""
+                print(f"  \u2192 {tag}{cut_expr}")
+        for trig_name, _ in ctx.trig_list:
+            cuts_by_trig[trig_name] = named_cuts
+
     # Run event loop
     result = book_and_run(
         mc, data_df, args,
@@ -254,6 +278,7 @@ def load_and_run(ctx, plot_vars, vars_2d=None, cm_2d=None):
         ctx.brilcalc_default, lumi_precomputed,
         sig_samples, dy_samples, tt_samples, qcd_samples,
         ctx.plot_dir,
+        cuts_by_trig=cuts_by_trig,
     )
 
     # Book data histograms if data is loaded

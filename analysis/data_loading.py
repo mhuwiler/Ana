@@ -24,46 +24,70 @@ def _extract_named_cuts(section):
     return []
 
 
+def _is_card_name(s):
+    """Check if a string is a cuts.yaml card name (not a C++ expression)."""
+    return not any(op in s for op in (">=", "<=", ">", "<", "&&", "||", "==", "!="))
+
+
+def _load_cuts_yaml():
+    """Load cuts.yaml, return (data_dict, path)."""
+    _ana_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _cuts_cfg = os.path.join(_ana_dir, "config", "cuts.yaml")
+    if not os.path.exists(_cuts_cfg):
+        print(f"WARNING: cuts.yaml not found, no cuts applied")
+        return {}, _cuts_cfg
+    with open(_cuts_cfg) as f:
+        return yaml.safe_load(f) or {}, _cuts_cfg
+
+
 def resolve_cuts(cuts):
     """Resolve CUTS config to a list of named cut tuples.
 
     Parameters
     ----------
     cuts : list, str, or None
-        [] → no cuts. ["expr", ...] → explicit. "tauhtauh" → card from cuts.yaml.
-        None → backwards compat.
+        [] → no cuts.
+        ["common", "tauhtauh"] → merge named cards from cuts.yaml.
+        ["nJets >= 2", ...] → explicit C++ expressions.
+        "tauhtauh" → shorthand for ["common", "tauhtauh"].
+        None → load common from cuts.yaml.
 
     Returns
     -------
     (list[tuple], str) — ([(name_or_None, expr), ...], source description)
     """
-    _ana_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    _cuts_cfg = os.path.join(_ana_dir, "config", "cuts.yaml")
+    # Empty list → no cuts
+    if isinstance(cuts, list) and len(cuts) == 0:
+        return [], "script"
 
+    # List of strings — card names or explicit C++ expressions
     if isinstance(cuts, list):
-        return [(None, c) for c in cuts], "script"
+        if all(isinstance(c, str) and _is_card_name(c) for c in cuts):
+            # List of card names → merge from cuts.yaml
+            data, _ = _load_cuts_yaml()
+            result = []
+            for card in cuts:
+                result += _extract_named_cuts(data.get(card))
+            return result, f"cuts.yaml [{' + '.join(cuts)}]"
+        else:
+            # Explicit C++ expressions
+            return [(None, c) for c in cuts], "script"
 
+    # String shorthand → "tauhtauh" means ["common", "tauhtauh"]
     if isinstance(cuts, str):
-        if not os.path.exists(_cuts_cfg):
-            print(f"WARNING: cuts.yaml not found, no cuts applied")
-            return [], f"cuts.yaml [{cuts}] (missing)"
-        with open(_cuts_cfg) as f:
-            data = yaml.safe_load(f) or {}
+        data, _ = _load_cuts_yaml()
         common = _extract_named_cuts(data.get("common"))
         if cuts == "common":
             return common, "cuts.yaml [common]"
         channel = _extract_named_cuts(data.get(cuts))
-        return common + channel, f"cuts.yaml [{cuts}]"
+        return common + channel, f"cuts.yaml [common + {cuts}]"
 
-    # None — backwards compat
-    if os.path.exists(_cuts_cfg):
-        with open(_cuts_cfg) as f:
-            data = yaml.safe_load(f) or {}
-        return _extract_named_cuts(data.get("cuts")), "config/cuts.yaml"
-    return [], "config/cuts.yaml"
+    # None → load common from cuts.yaml
+    data, _ = _load_cuts_yaml()
+    return _extract_named_cuts(data.get("common")), "cuts.yaml [common]"
 
 
-def load_mc_samples(group_files_by_sample, xsec, max_events, args, rdf_exprs=None, cuts=None):
+def load_mc_samples(group_files_by_sample, xsec, max_events, args, rdf_exprs=None):
     """Build weighted MC RDataFrames and define analysis columns.
 
     Parameters
@@ -173,20 +197,6 @@ def load_mc_samples(group_files_by_sample, xsec, max_events, args, rdf_exprs=Non
             if "w" not in cols:
                 mc[name] = mc[name].Define("w", w_exprs[name])
 
-    # Apply cuts
-    named_cuts, _src = resolve_cuts(cuts)
-    if named_cuts:
-        print(f"\n[cuts] Applying {len(named_cuts)} cuts from {_src}:")
-        for cut_name, cut_expr in named_cuts:
-            if cut_name:
-                print(f"  \u2192 {cut_name}: {cut_expr}")
-            else:
-                print(f"  \u2192 {cut_expr}")
-            for name in mc:
-                mc[name] = mc[name].Filter(cut_expr)
-    elif isinstance(cuts, (list, str)):
-        print(f"\n[cuts] No cuts applied ({_src})")
-
     return mc, mc_files_map, dy_samples, tt_samples, sig_samples, qcd_samples
 
 
@@ -232,5 +242,6 @@ def load_data(args, brilcalc_default=None, data_years=None, data_runs=None):
     ROOT.gErrorIgnoreLevel = _prev_err
     print(f"  Loaded {len(data_files)} data files into RDataFrame")
 
-    data_df = define_kinematics(data_df)
+    from analysis.definitions import define_kinematics_data
+    data_df = define_kinematics_data(data_df)
     return data_df, None

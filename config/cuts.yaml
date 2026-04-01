@@ -1,8 +1,8 @@
 # Analysis cuts — per-channel cards with named cuts.
 #
 # Format: key = cut name, value = C++ expression
-# CUTS = "tauhtauh"   → loads common + tauhtauh
-# CUTS = []           → no cuts
+# CUTS = ["common", "tauhtauh"]  → merges common + tauhtauh
+# CUTS = []                      → no cuts
 #
 # Comment out a line to disable that cut.
 
@@ -10,20 +10,21 @@ common:
   min_jets: "nJets >= 2"
   b_coi0_score: "b_coi0_score > 0.6"
   b_coi1_score: "b_coi1_score > 0.6"
+
+tauhtauh:
   tau_coi0_score: "tau_coi0_score > 0.3"
   tau_coi1_score: "tau_coi1_score > 0.3"
   mbb_window: "mbb_coi > 70 && mbb_coi < 150"
   mtautau_window: "mtautau_coi > 50 && mtautau_coi < 150"
 
-tauhtauh:
-  # Require 4 jets
-
 taumutauh:
-  # muon_req: "nMuons >= 1"
-  # TODO: Require 3 jets 
-  # 1. Tag b jets (2 jets)
-  # 2. Tag tau jets (1 or 2 jets)
-  # 3. Muon non-leading jet (priority): not within the b jets dr
+  tau_coi0_score: "tau_coi0_score > 0.3"
+  muon_req: "nMuons >= 1"
+  mbb_window: "mbb_coi > 70 && mbb_coi < 150"
+  mtautau_window: "mtautau_coi > 30 && mtautau_coi < 150"
 
 tauetauh:
-  # electron_req: "nElectrons >= 1"
+  tau_coi0_score: "tau_coi0_score > 0.3"
+  electron_req: "nElectrons >= 1"
+  mbb_window: "mbb_coi > 70 && mbb_coi < 150"
+  mtautau_window: "mtautau_coi > 30 && mtautau_coi < 150"

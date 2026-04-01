@@ -6,6 +6,10 @@ import resource
 from analysis.constants import STACK_SIZE_MB
 
 
+_root_initialized = False
+_macros_loaded = False
+
+
 def init_root(nthreads=4, stack_mb=None):
     """Initialize ROOT with ImplicitMT and increased stack size.
 
@@ -16,6 +20,11 @@ def init_root(nthreads=4, stack_mb=None):
     stack_mb : int or None
         Stack size in MB. Defaults to STACK_SIZE_MB from constants.
     """
+    global _root_initialized
+    if _root_initialized:
+        return
+    _root_initialized = True
+
     if stack_mb is None:
         stack_mb = STACK_SIZE_MB
     stack_bytes = stack_mb * 1024 * 1024
@@ -35,6 +44,11 @@ def load_macros(ana_dir=None):
         Root directory of the analysis repo. Defaults to parent of this file's
         directory.
     """
+    global _macros_loaded
+    if _macros_loaded:
+        return
+    _macros_loaded = True
+
     import ROOT
 
     if ana_dir is None:

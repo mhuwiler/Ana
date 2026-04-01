@@ -20,7 +20,6 @@ class AnalysisConfig:
     decay_modes: dict     # {int: {process, label, color}}
     bkg_modes: list       # list of ints
     sig_modes: list       # list of ints
-    cutflow_steps: list   # list of (name, expr_or_None) tuples
 
 
 def _load_yaml(path):
@@ -29,7 +28,7 @@ def _load_yaml(path):
 
 
 def load_analysis_config(config_dir="config"):
-    """Load decay modes and cutflow steps from config/analysis.yaml.
+    """Load decay modes from config/analysis.yaml.
 
     Returns
     -------
@@ -43,14 +42,10 @@ def load_analysis_config(config_dir="config"):
     bkg_modes = cfg.get("bkg_modes", [1, 2, 3, 4, 5, 10, 11, 12, 30])
     sig_modes = cfg.get("sig_modes", [20, 21, 22])
 
-    cutflow_steps_raw = cfg.get("cutflow_steps", [])
-    cutflow_steps = [(s[0], s[1]) for s in cutflow_steps_raw]
-
     return AnalysisConfig(
         decay_modes=decay_modes,
         bkg_modes=bkg_modes,
         sig_modes=sig_modes,
-        cutflow_steps=cutflow_steps,
     )
 
 

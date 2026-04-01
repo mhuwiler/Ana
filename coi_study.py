@@ -5,7 +5,6 @@ from analysis.variables import PlotVar
 
 # ── User config ────────────────────────────────────────────────────────────────
 SAMPLES      = ["HHbbtt", "DY", "TT", "QCD"]
-TRIGGERS     = ["NoTrigger", "DST_JetHT", "DST_Muon", "DST_Electron"]
 DATA         = False
 NTHREADS     = 32
 NPLOT_WORKERS = 8
@@ -13,7 +12,14 @@ THEME        = "light"
 OVERWRITE    = True
 MAX_MC_FILES = 1
 MAX_EVENTS   = None
-CUTS         = "common"
+
+# Each entry: (trigger, [cut cards from cuts.yaml])
+CUTS = [
+    ("NoTrigger",     ["common", "tauhtauh"]),
+    ("DST_JetHT",     ["common", "tauhtauh"]),
+    ("DST_Muon",      ["common", "taumutauh"]),
+    ("DST_Electron",  ["common", "tauetauh"]),
+]
 
 # ── Variables to plot ──────────────────────────────────────────────────────────
 PLOT_VARS = [
@@ -49,13 +55,12 @@ PLOT_VARS = [
 # ── Run ────────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     from analysis.runner import setup, load_and_run
-    ctx = setup(__file__, samples=SAMPLES, triggers=TRIGGERS, data=DATA,
+    ctx = setup(__file__, samples=SAMPLES, cuts=CUTS, data=DATA,
                 nthreads=NTHREADS, nplot_workers=NPLOT_WORKERS, theme=THEME, overwrite=OVERWRITE,
-                max_mc_files=MAX_MC_FILES, max_events=MAX_EVENTS, cuts=CUTS)
+                max_mc_files=MAX_MC_FILES, max_events=MAX_EVENTS)
     result = load_and_run(ctx, PLOT_VARS)
     result.plot.stacked()
     result.plot.stacked(ratio="significance")
     result.plot.stacked(ratio="cum_significance")
-    # result.plot.stacked(ratio="efficiency")
     result.plot.shapes()
 

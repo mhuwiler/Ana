@@ -265,6 +265,47 @@ def define_kinematics(df):
     return df
 
 
+_DATA_AK4 = "ScoutingPFJetRecluster"
+
+
+def define_kinematics_data(df):
+    """Define kinematic columns for data (v1 branches, no UParT/COI)."""
+    _D = _DATA_AK4
+    df = (df
+        .Define("ak4_pt0",  f"{_D}_pt[0]")
+        .Define("ak4_pt1",  f"{_D}_pt[1]")
+        .Define("ak4_pt2",  f"{_D}_pt[2]")
+        .Define("ak4_pt3",  f"{_D}_pt[3]")
+        .Define("ak4_eta0", f"{_D}_eta[0]")
+        .Define("ak4_eta1", f"{_D}_eta[1]")
+        .Define("ak4_eta2", f"{_D}_eta[2]")
+        .Define("ak4_eta3", f"{_D}_eta[3]")
+        .Define("ak4_mass0", f"{_D}_mass[0]")
+        .Define("ak4_mass1", f"{_D}_mass[1]")
+        .Define("HT",         f"Sum({_D}_pt)")
+        .Define("nJets",      f"n{_D}")
+        .Define("nLeptons",   "nScoutingMuonVtx + nScoutingElectron")
+        .Define("nMuons",     "nScoutingMuonVtx")
+        .Define("nElectrons", "nScoutingElectron")
+        .Define("MHT",
+                f"(float)sqrt("
+                f"pow(Sum({_D}_pt*cos({_D}_phi)),2) + "
+                f"pow(Sum({_D}_pt*sin({_D}_phi)),2))")
+        .Define("centrality",
+                f"(float)(Sum({_D}_pt) / "
+                f"Sum({_D}_pt * cosh({_D}_eta)))")
+        # Dijet variables from leading pair
+        .Define("mjj_01",
+                f"(float)sqrt(2*{_D}_pt[0]*{_D}_pt[1]*"
+                f"(cosh({_D}_eta[0]-{_D}_eta[1])-cos({_D}_phi[0]-{_D}_phi[1])))")
+        .Define("dR_01",
+                f"(float)sqrt(pow({_D}_eta[0]-{_D}_eta[1],2)+"
+                f"pow(TVector2::Phi_mpi_pi({_D}_phi[0]-{_D}_phi[1]),2))")
+        .Define("dEta_01", f"(float)abs({_D}_eta[0]-{_D}_eta[1])")
+    )
+    return df
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Gen-level columns (signal-only gen matching)
 # ═══════════════════════════════════════════════════════════════════════════════

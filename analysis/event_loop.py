@@ -41,6 +41,7 @@ def book_and_run(
     brilcalc_default, lumi,
     sig_samples, dy_samples, tt_samples, qcd_samples,
     plot_dir,
+    cuts_by_trig=None,
 ):
     """Book all analysis actions, run one unified event loop, and return results.
 
@@ -51,9 +52,9 @@ def book_and_run(
     data_df : RDataFrame or None
         Data RDataFrame with kinematics columns, or None for MC-only.
     args : argparse.Namespace
-        Must have: skip_cutflow.
+        Runtime flags (max_mc_files, no_data, etc.).
     ana_cfg : AnalysisConfig
-        Decay modes, bkg_modes, sig_modes, cutflow_steps.
+        Decay modes, bkg_modes, sig_modes.
     trig_list : list of (name, expr)
         Inclusive trigger definitions.
     excl_trig_list : list of (name, expr)
@@ -83,11 +84,13 @@ def book_and_run(
     decay_modes = ana_cfg.decay_modes
     bkg_modes = ana_cfg.bkg_modes
     sig_modes = ana_cfg.sig_modes
-    cutflow_steps = ana_cfg.cutflow_steps
+    if cuts_by_trig is None:
+        cuts_by_trig = {}
     active_modes = bkg_modes + sig_modes
 
-    data_acc = data_df.Filter(BASE_CUT) if data_df is not None else None
-    mc_acc   = {name: df.Filter(BASE_CUT) for name, df in mc.items()}
+    # mc here is PRE-CUT — cuts are applied per-trigger below
+    mc_base = {name: df.Filter(BASE_CUT) for name, df in mc.items()}
+    data_base = data_df.Filter(BASE_CUT) if data_df is not None else None
 
     proc_to_samples = {
         "DY": dy_samples, "TT": tt_samples,
@@ -106,12 +109,21 @@ def book_and_run(
 
     for trig_name, trig in trig_list:
         print(f"Booking actions for {trig_name} ...")
+
+        # Apply trigger filter
         if trig is not None:
-            data_sel = data_acc.Filter(trig) if data_acc is not None else None
-            mc_sel = {name: df.Filter(trig) for name, df in mc_acc.items()}
+            data_sel = data_base.Filter(trig) if data_base is not None else None
+            mc_sel = {name: df.Filter(trig) for name, df in mc_base.items()}
         else:
-            data_sel = data_acc
-            mc_sel = dict(mc_acc)
+            data_sel = data_base
+            mc_sel = dict(mc_base)
+
+        # Apply per-trigger cuts from cuts_by_trig
+        trig_cuts = cuts_by_trig.get(trig_name, [])
+        for _, cut_expr in trig_cuts:
+            if data_sel is not None:
+                data_sel = data_sel.Filter(cut_expr)
+            mc_sel = {name: df.Filter(cut_expr) for name, df in mc_sel.items()}
 
         sig_mHH_ptrs = [
             mc_sel[s].Histo1D(
@@ -127,15 +139,17 @@ def book_and_run(
             "sig_mHH_ptrs": sig_mHH_ptrs,
         }
 
+    # Book cutflow actions (per-trigger, using pre-cut mc with progressive cuts)
     phase1_data = None
-    if not args.skip_cutflow:
+    has_cutflow = any(len(cuts_by_trig.get(tn, [])) > 0 for tn, _ in trig_list)
+    if has_cutflow:
         phase1_data = book_cutflow_actions(
-            trig_list, cutflow_steps, mc, data_df, mc_acc, data_acc,
+            trig_list, cuts_by_trig, mc, data_df, mc_base, data_base,
             decay_modes, active_modes, sig_samples, dy_samples, tt_samples,
             qcd_samples, unified_ptrs)
 
-    mc_denom_groups, _ = build_groups(active_modes, decay_modes, proc_to_samples, mc_acc)
-    denom_book = book_mc_denom(mc_acc, mc_denom_groups, plot_vars, unified_ptrs)
+    mc_denom_groups, _ = build_groups(active_modes, decay_modes, proc_to_samples, mc_base)
+    denom_book = book_mc_denom(mc_base, mc_denom_groups, plot_vars, unified_ptrs)
 
     mc_items_by_trig, histo_books, sig_indices, bkg_indices, _ = \
         book_mc_per_trigger(trig_selections, plot_vars, decay_modes, active_modes,
@@ -146,7 +160,7 @@ def book_and_run(
     gen_histo_book = book_gen_histograms(trig_selections, gen_plot_vars,
                                           sig_samples, sig_modes, unified_ptrs)
     excl_histo_books = book_exclusive_histograms(
-        excl_trig_list, mc_acc, plot_vars, active_modes, decay_modes,
+        excl_trig_list, mc_base, plot_vars, active_modes, decay_modes,
         proc_to_samples, unified_ptrs)
 
     # ── Run unified event loop ──
@@ -166,7 +180,7 @@ def book_and_run(
               f"extracted in {time.time() - t0_lumi:.1f}s")
         print(f"  Data lumi (LS-matched) = {lumi:.4f} fb^-1")
 
-    if not args.skip_cutflow:
+    if phase1_data is not None:
         cutflow_tables = extract_and_print_cutflow(
             trig_list, phase1_data, decay_modes, active_modes,
             dy_samples, tt_samples, qcd_samples, sig_samples,
