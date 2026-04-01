@@ -27,7 +27,7 @@ def init_root(nthreads=4, stack_mb=None):
 
 
 def load_macros(ana_dir=None):
-    """Compile and load C++ analysis macros via ACLiC.
+    """Load C++ analysis macros. Uses ACLiC if .so exists, else interpreted.
 
     Parameters
     ----------
@@ -44,6 +44,12 @@ def load_macros(ana_dir=None):
     import sys
     sys.path.insert(0, ana_dir)
     ROOT.gInterpreter.AddIncludePath(ana_dir)
-    ROOT.gROOT.LoadMacro("elements/GenMatching.C+")
-    ROOT.gROOT.LoadMacro("elements/RecoObjects.C+")
+    ROOT.gInterpreter.AddIncludePath(os.path.join(ana_dir, "elements"))
+
+    for macro in ["elements/GenMatching.C", "elements/RecoObjects.C"]:
+        so = macro.replace(".C", "_C.so")
+        if os.path.exists(so) and os.path.getmtime(so) >= os.path.getmtime(macro):
+            ROOT.gROOT.LoadMacro(f"{macro}+")
+        else:
+            ROOT.gROOT.LoadMacro(macro)
     print("CWD =", os.getcwd())

@@ -1,0 +1,28 @@
+# Trigger definitions for cutflow_TrigEff.py
+# expr: null means no trigger requirement (preselection only)
+# expr: string references a variable from utils.triggers (e.g., DST_JetHT_expr)
+
+triggers:
+  - name: NoTrigger
+    expr: null
+  - name: DST_JetHT
+    expr: DST_JetHT_expr
+  - name: DST_Muon
+    expr: DST_MU_expr
+  - name: DST_Electron
+    expr: DST_EL_expr
+  - name: PARKING_HH
+    expr: PARKING_HH_expr
+
+# Whether to also generate exclusive-trigger variants
+# (events that fired ONLY one trigger, not any other)
+exclusive: true
+
+# Brilcalc luminosity files per trigger
+brilcalc_files:
+  DST_JetHT: output/brilcalc/brilcalc_DST_PFScouting_JetHT.txt
+  PARKING_HH: output/brilcalc/brilcalc_PARKING_HH.txt
+
+# Fallback: if a trigger's brilcalc file is missing, use this trigger's data
+brilcalc_fallback:
+  PARKING_HH: DST_JetHT

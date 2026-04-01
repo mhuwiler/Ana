@@ -17,6 +17,8 @@ pyyaml = "*"
 xrootd = "*"
 pandas = "*"
 ipykernel = "*"
+seaborn = ">=0.13.2,<0.14"
+fpdf2 = ">=2.8.7,<3"
 
 [pypi-dependencies]
 brilws = "*"

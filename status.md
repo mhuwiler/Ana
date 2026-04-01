@@ -73,17 +73,25 @@ Three trigger paths analyzed in parallel:
 | Shape | Normalized MC overlay | `shape/{trig}_{var}.png` |
 | Trigger overlay | All-MC summed, 3 triggers overlaid | `overlay/{var}.png` |
 | Per-channel overlay | Signal-only per decay channel | `overlay/{ch}_{var}.png` |
-| Eff stacked | Stacked + trigger efficiency panel | `eff_stacked/{trig}_{var}.png` |
-| Sig stacked | Stacked + S/√B panel | `sig_stacked/{trig}_{var}.png` |
+| Eff stacked | Stacked + trigger efficiency panel | `eff/{trig}/{var}.png` |
+| Sig stacked | Stacked + bin-by-bin S/√B panel | `sig/{trig}/{var}.png` |
+| Cum sig | Stacked + cumulative S/√B (right-to-left) | `cum_sig/{trig}/{var}.png` |
 
 
 ## Code Architecture
 
 ```
 Ana/
-├── cutflow_TrigEff.py      Main analysis script (cutflow + histograms + plots)
+├── cutflow_TrigEff.py      Orchestrator (~590 LOC): CLI, phase sequencing
 ├── make_pdf.py             PDF comparison tool (side-by-side triggers)
 ├── genAna.py               Gen-level analysis (signal MC only)
+├── analysis/               Core analysis modules (extracted from cutflow_TrigEff.py)
+│   ├── config.py           YAML config loaders (variables, triggers, decay modes)
+│   ├── definitions.py      RDataFrame .Define() chains (kinematics, gen matching)
+│   ├── histograms.py       Histogram booking & materialisation
+│   ├── cutflow.py          Cutflow booking, extraction, markdown formatting
+│   ├── cache.py            Histogram cache save/load/invalidation
+│   └── plots.py            Plot orchestration (Phase 3, 3.5, 5)
 ├── elements/               C++ engine (compiled via ACLiC)
 │   ├── common.h            Shared types, PDG constants, utilities
 │   ├── GenMatching.C       Gen-level matching (DY, TT, Signal, GlobalDecayMode)
@@ -92,18 +100,20 @@ Ana/
 │   ├── samples.yaml        MC samples, file paths, cross sections
 │   ├── objects.yaml        Object quality cuts (muon, electron, btag)
 │   ├── acceptance.yaml     Fiducial/preselection cuts
-│   └── regions.yaml        Signal region mass windows
+│   ├── regions.yaml        Signal region mass windows
+│   ├── cuts.yaml           User-defined selection cuts
+│   ├── variables.yaml      Plot variable definitions (bins, ranges, labels)
+│   └── triggers.yaml       Trigger definitions + brilcalc paths
 ├── utils/                  Python utilities
 │   ├── data.py             Sample loading, XCache, file discovery
-│   ├── plotting.py         All plot functions (stacked, shape, overlay, etc.)
-│   └── triggers.py         Trigger bit definitions (DST, Parking)
+│   ├── plotting.py         Matplotlib/mplhep low-level plot functions
+│   ├── triggers.py         Trigger bit definitions (DST, Parking)
+│   └── skim.py             Slim ROOT file writer (branch auto-detection)
 ├── scripts/                Shell scripts
 │   ├── run_xsec.sh         GenXSecAnalyzer wrapper
 │   ├── run_brilcalc.sh     Luminosity calculation
 │   └── check_prescale.sh   Trigger prescale checks
 ├── legacy/                 Old code (kept for reference, not used)
-│   ├── HHbbtautauAnaElements.C
-│   └── Particle.h
 ├── des/                    Design docs (separate git repo)
 ├── notes.md                Working notes + activity log
 └── status.md               This file
@@ -125,6 +135,7 @@ Ana/
 - [ ] Investigate missing QCD HT bins (400-600, 600-800) — request production?
 - [ ] Add leptonic triggers (DST_Muon, DST_Electron, PARKING_Muon, PARKING_EG)
 - [ ] Enable BSM signal benchmarks (9 coupling points in config, commented out)
-- [ ] Performance optimization: merge 7 RunGraphs into 1 (already done), profile remaining bottlenecks
-- [ ] Generalize `_build_groups()` to be fully config-driven (remove hardcoded if/elif chains)
-- [ ] Organize plots into subfolders (stacked/, shape/, overlay/) instead of flat naming
+- [x] Performance optimization: merge 7 RunGraphs into 1 (done)
+- [x] Generalize `_build_groups()` to be fully config-driven (done — analysis/histograms.py)
+- [x] Organize plots into subfolders (stacked/, shape/, overlay/) (done)
+- [x] Modularise cutflow_TrigEff.py into analysis/ package (done — 2,280→590 LOC)

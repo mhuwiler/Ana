@@ -1,0 +1,25 @@
+# Analysis configuration: decay mode definitions and cutflow steps.
+# Plot variable definitions live in user scripts (cutflow_TrigEff.py, genAna.py).
+
+decay_modes:
+  0:  {process: unknown,  label: "Unknown",                          color: gray}
+  1:  {process: DY,       label: "DY (Z$\\to$ee)",                   color: gold}
+  2:  {process: DY,       label: "DY (Z$\\to\\mu\\mu$)",              color: orange}
+  3:  {process: DY,       label: "DY (Z$\\to\\tau_h\\tau_h$)",        color: darkorange}
+  4:  {process: DY,       label: "DY (Z$\\to\\tau_\\mu\\tau_h$)",      color: coral}
+  5:  {process: DY,       label: "DY (Z$\\to\\tau_e\\tau_h$)",        color: tomato}
+  10: {process: TT,       label: "TT (had)",                        color: limegreen}
+  11: {process: TT,       label: "TT (semi)",                       color: forestgreen}
+  12: {process: TT,       label: "TT (dilep)",                      color: teal}
+  20: {process: HHbbtt,   label: "$HH\\to bb\\tau_h\\tau_h$",         color: "tab:red"}
+  21: {process: HHbbtt,   label: "$HH\\to bb\\tau_\\mu\\tau_h$",       color: "tab:pink"}
+  22: {process: HHbbtt,   label: "$HH\\to bb\\tau_e\\tau_h$",         color: "tab:purple"}
+  30: {process: QCD,      label: "QCD multijet",                     color: "tab:cyan"}
+
+bkg_modes: [1, 2, 3, 4, 5, 10, 11, 12, 30]
+sig_modes: [20, 21, 22]
+
+cutflow_steps:
+  - ["Trigger",                null]
+  - ["≥4 jets",                "nScoutingPFJetRecluster2 >= 4"]
+  - ["4 jets pT > 20",         "ak4_pt0 > 20 && ak4_pt1 > 20 && ak4_pt2 > 20 && ak4_pt3 > 20"]

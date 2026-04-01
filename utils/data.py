@@ -501,3 +501,44 @@ def extract_lumi(run_take, ls_take, brilcalc_data):
 
     data_runs = sorted(run_ls_count.keys())
     return lumi, data_runs, n_missing
+
+
+# ---------------------------------------------------------------------------
+# File list helpers
+# ---------------------------------------------------------------------------
+
+def limit_files(files, sample_name, max_files=0, all_events=False, max_events=0):
+    """Filter missing files and apply a file-count cap.
+
+    Parameters
+    ----------
+    files : list[str]
+        Candidate file paths.
+    sample_name : str
+        Used in warning/error messages.
+    max_files : int
+        Hard cap on number of files (0 = no hard cap).
+    all_events : bool
+        If True, skip the max_events-derived cap.
+    max_events : int
+        Used to derive a file count when max_files == 0 and not all_events.
+
+    Returns
+    -------
+    list[str]
+        Existing files, capped as requested.
+    """
+    good_files = [f for f in files if os.path.isfile(f)]
+    if len(good_files) < len(files):
+        print(f"  WARNING: {len(files) - len(good_files)} missing file(s) "
+              f"in {sample_name}, using {len(good_files)}/{len(files)}")
+    if not good_files:
+        raise FileNotFoundError(f"No valid files for {sample_name}")
+    caps = []
+    if max_files > 0:
+        caps.append(max_files)
+    if not all_events and max_events > 0:
+        caps.append(max(1, max_events // 10_000))
+    if caps:
+        good_files = good_files[:min(caps)]
+    return good_files

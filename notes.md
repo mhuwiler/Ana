@@ -4,6 +4,39 @@
 
 ## Activity Log
 
+### 2026-04-01
+
+- Added cumulative S/√B plots (`cum_sig/` directory, `ratio="cum_significance"`)
+  - Right-to-left integral: for each bin edge x, integrate S and B from x to ∞
+  - Both standalone function and parallel `render_task` path
+- Fixed parallel plotting: `ProcessPoolExecutor` with `spawn` context
+  - Added `if __name__ == '__main__':` guards to all 9 user scripts
+  - Moved heavy imports (`analysis.runner`) inside guard so spawn workers stay lightweight
+  - Removed top-level `import ROOT` from `utils/plotting.py` (workers don't need ROOT)
+  - Emptied `utils/__init__.py` to prevent eager import chain
+- Fixed CMS label overlapping between panels in two-panel plots (sig, cum_sig, eff)
+- Fixed `tight_layout` warning for gridspec figures
+- Condensed negative-yield warnings to single summary line per trigger (was 20+ lines)
+- Extracted `_setup_significance_figure()` helper to deduplicate sig/cum_sig code
+- Cleaned up `skim.py` to reuse `collect_all_expressions()` from `utils/skim.py`
+- Created Foam wiki (`wiki/`) with 16 interconnected notes
+- Added `.vscode/` config for Foam extension
+
+### 2026-03-27
+
+- Major modularisation refactoring of `cutflow_TrigEff.py` (2,280 → 590 LOC)
+- Created `analysis/` package with 7 modules:
+  - `config.py` — YAML config loaders (variables, triggers, decay modes)
+  - `definitions.py` — all RDataFrame .Define() chains (kinematics, gen matching)
+  - `histograms.py` — histogram booking & materialisation
+  - `cutflow.py` — cutflow booking, extraction, markdown formatting
+  - `cache.py` — histogram cache save/load/invalidation
+  - `plots.py` — plot orchestration (Phase 3, 3.5, 5)
+- Created `config/variables.yaml` — all PLOT_VARS, GEN_PLOT_VARS, PLOT_VARS_2D,
+  DECAY_MODES, CUTFLOW_STEPS moved from inline Python to YAML
+- Created `config/triggers.yaml` — TRIG_LIST, exclusive triggers, brilcalc paths
+- Updated `des/architecture.md` and `status.md` to reflect new structure
+
 ### 2026-03-20
 
 - Ran GenXSecAnalyzer for all 7 QCD-4Jets HT-binned samples — cross sections

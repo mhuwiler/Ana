@@ -15,8 +15,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import mplhep as hep
 
-import ROOT
-
 
 # ---------------------------------------------------------------------------
 # Style setup
@@ -144,17 +142,17 @@ def teff_to_np(teff):
 # MC component helpers
 # ---------------------------------------------------------------------------
 
-def _build_mc_components(h_mc_list, mc_items, sort_by_yield=True):
+_neg_yield_warned = set()
+
+
+def _build_mc_components(h_mc_list, mc_items, sort_by_yield=True, warn=True):
     """Convert MC histograms (TH1 objects) to numpy arrays (vals, errs), optionally sorted."""
     components = []
+    neg_groups = []
     for h, item in zip(h_mc_list, mc_items):
         _, vals_raw, errs_raw = th1_to_np(h)
         if np.any(vals_raw < 0):
-            neg_count = np.sum(vals_raw < 0)
-            print(
-                f"  -> WARNING: Plotting '{item['label']}' - found {neg_count} "
-                f"bin(s) with negative yields. Clipping to 0 for the stack."
-            )
+            neg_groups.append(item['label'])
         vals_clipped = np.maximum(vals_raw, 0.0)
         components.append({
             "item": item,
@@ -162,6 +160,13 @@ def _build_mc_components(h_mc_list, mc_items, sort_by_yield=True):
             "errs": errs_raw,
             "yield": float(np.sum(vals_clipped)),
         })
+
+    if warn and neg_groups:
+        key = frozenset(neg_groups)
+        if key not in _neg_yield_warned:
+            _neg_yield_warned.add(key)
+            names = ", ".join(neg_groups)
+            print(f"  [plots] {len(neg_groups)} group(s) clipped negative bins to 0 (NLO): {names}")
 
     if sort_by_yield:
         components.sort(key=lambda x: x["yield"])
@@ -328,35 +333,15 @@ def plot_stacked_with_efficiency(
 
 
 # ---------------------------------------------------------------------------
-# Stacked MC + data with S/sqrt(B) ratio panel
+# Two-panel stacked MC + ratio helpers
 # ---------------------------------------------------------------------------
 
-def plot_stacked_with_significance(
-    h_mc_list, mc_items, *,
-    h_data=None,
-    sig_indices=None,
-    bkg_indices=None,
-    logy=True,
-    sort_mc_by_yield=True,
-    title=None,
-):
-    """Stacked MC plot with a per-bin S/sqrt(B) panel below.
+def _setup_significance_figure(h_mc_list, mc_items, *, h_data=None,
+                               sig_indices, bkg_indices, logy=True,
+                               sort_mc_by_yield=True, title=None):
+    """Shared setup for significance plots: two-panel figure with stacked top.
 
-    Top panel: stacked MC + optional data overlay.
-    Bottom panel: S/sqrt(B) per bin for each signal channel individually.
-
-    Parameters
-    ----------
-    h_mc_list : list of TH1
-        MC histograms (one per group), already scaled to luminosity.
-    mc_items : list of dict
-        Label/color info per MC group.
-    h_data : TH1 or None
-        Data histogram.
-    sig_indices : list of int
-        Indices into h_mc_list that are signal channels (plotted individually).
-    bkg_indices : list of int
-        Indices into h_mc_list that are background (summed for B).
+    Returns (fig, ax, rax, centers, bkg_vals) — caller draws the ratio panel.
     """
     if sig_indices is None or bkg_indices is None:
         raise ValueError("sig_indices and bkg_indices must be provided")
@@ -370,16 +355,13 @@ def plot_stacked_with_significance(
 
     centers = 0.5 * (edges[:-1] + edges[1:])
     widths = np.diff(edges)
-
     mc_components = _build_mc_components(h_mc_list, mc_items, sort_by_yield=sort_mc_by_yield)
 
-    # ── Figure with two panels ──
     fig = plt.figure(figsize=(8, 8))
     gs = fig.add_gridspec(2, 1, height_ratios=[3, 1], hspace=0.05)
     ax = fig.add_subplot(gs[0])
     rax = fig.add_subplot(gs[1], sharex=ax)
 
-    # ── Top panel: stacked MC + data ──
     stack_total = _draw_mc_stack(ax, centers, widths, mc_components)
     _draw_mc_stat_unc(ax, edges, stack_total, mc_components)
     if data_vals is not None:
@@ -399,14 +381,26 @@ def plot_stacked_with_significance(
             ymax = max(ymax, float(np.max(data_vals)))
         ax.set_ylim(0.5, max(10.0, 5.0 * ymax))
 
-    # ── Bottom panel: S / sqrt(B) per bin ──
-    # Sum background bins
+    # Sum background
     bkg_vals = np.zeros(len(centers), dtype=float)
     for bi in bkg_indices:
         _, bv, _ = th1_to_np(h_mc_list[bi])
         bkg_vals += np.maximum(bv, 0.0)
 
-    # Plot each signal channel
+    return fig, ax, rax, centers, bkg_vals
+
+
+def plot_stacked_with_significance(
+    h_mc_list, mc_items, *,
+    h_data=None, sig_indices=None, bkg_indices=None,
+    logy=True, sort_mc_by_yield=True, title=None,
+):
+    """Stacked MC + per-bin S/sqrt(B) ratio panel."""
+    fig, ax, rax, centers, bkg_vals = _setup_significance_figure(
+        h_mc_list, mc_items, h_data=h_data,
+        sig_indices=sig_indices, bkg_indices=bkg_indices,
+        logy=logy, sort_mc_by_yield=sort_mc_by_yield, title=title)
+
     for si in sig_indices:
         _, sv, _ = th1_to_np(h_mc_list[si])
         sv = np.maximum(sv, 0.0)
@@ -420,7 +414,47 @@ def plot_stacked_with_significance(
     rax.set_ylim(bottom=0)
     rax.grid(True, axis="y", alpha=0.3)
     rax.legend(loc="upper right", fontsize=9)
+    return fig, ax, rax
 
+
+def plot_stacked_with_cumulative_significance(
+    h_mc_list, mc_items, *,
+    h_data=None, sig_indices=None, bkg_indices=None,
+    logy=True, sort_mc_by_yield=True, title=None,
+):
+    """Stacked MC + cumulative S/sqrt(B) ratio panel (both cut directions)."""
+    fig, ax, rax, centers, bkg_vals = _setup_significance_figure(
+        h_mc_list, mc_items, h_data=h_data,
+        sig_indices=sig_indices, bkg_indices=bkg_indices,
+        logy=logy, sort_mc_by_yield=sort_mc_by_yield, title=title)
+
+    # Sum signal across channels
+    sig_vals = np.zeros_like(centers)
+    for si in sig_indices:
+        _, sv, _ = th1_to_np(h_mc_list[si])
+        sig_vals += np.maximum(sv, 0.0)
+
+    # Right-to-left: keep events > x
+    sig_r = np.cumsum(sig_vals[::-1])[::-1]
+    bkg_r = np.cumsum(bkg_vals[::-1])[::-1]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        cum_r = np.where(bkg_r > 0, sig_r / np.sqrt(bkg_r), 0.0)
+
+    # Left-to-right: keep events < x
+    sig_l = np.cumsum(sig_vals)
+    bkg_l = np.cumsum(bkg_vals)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        cum_l = np.where(bkg_l > 0, sig_l / np.sqrt(bkg_l), 0.0)
+
+    rax.step(centers, cum_r, where="mid", linewidth=1.5,
+             color="tab:red", label=r"cut $>x$")
+    rax.step(centers, cum_l, where="mid", linewidth=1.5,
+             color="tab:blue", label=r"cut $<x$")
+
+    rax.set_ylabel(r"Cumulative $S\,/\,\sqrt{B}$")
+    rax.set_ylim(bottom=0)
+    rax.grid(True, axis="y", alpha=0.3)
+    rax.legend(loc="upper right", fontsize=9)
     return fig, ax, rax
 
 
@@ -580,7 +614,7 @@ def th2_to_np(h2):
 
 
 def plot_2d_hist(h2, *, xlabel=None, ylabel=None, title=None,
-                 log_z=True, cmap="viridis"):
+                 log_z=True, cmap="viridis", lumi=None):
     """Plot a ROOT TH2 as a matplotlib pcolormesh heatmap."""
     from matplotlib.colors import LogNorm
 
@@ -600,5 +634,182 @@ def plot_2d_hist(h2, *, xlabel=None, ylabel=None, title=None,
         ax.set_ylabel(ylabel)
     if title:
         ax.set_title(title)
-    hep.cms.label("Work in Progress", data=False, ax=ax)
+    cms_label(ax, lumi=lumi)
+    fig.tight_layout()
     return fig
+
+
+# ── Confusion matrix ────────────────────────────────────────────────────────
+
+def plot_confusion_matrix(matrix, row_labels, col_labels, *,
+                          title=None, lumi=None):
+    """Plot a confusion matrix as an annotated seaborn heatmap.
+
+    Parameters
+    ----------
+    matrix : np.ndarray
+        2D array of fractions (rows=truth, cols=predicted). Each row sums to 1.
+    row_labels, col_labels : list[str]
+        Labels for rows (y-axis, truth) and columns (x-axis, predicted).
+    """
+    import seaborn as sns
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.heatmap(matrix, annot=True, fmt=".1%", cmap="Blues",
+                xticklabels=col_labels, yticklabels=row_labels,
+                vmin=0, vmax=1, linewidths=1, linecolor="white",
+                cbar_kws={"label": "Fraction"}, ax=ax)
+    ax.set_xlabel("Tagger prediction")
+    ax.set_ylabel("Gen truth")
+    if title:
+        ax.set_title(title)
+    cms_label(ax, lumi=lumi)
+    fig.tight_layout()
+    return fig
+
+
+# ── Parallel rendering ──────────────────────────────────────────────────────
+
+def prepare_mc_task(h_mc_list, mc_items, h_data=None, warn=True):
+    """Convert ROOT histograms to picklable numpy data for parallel rendering."""
+    edges = th1_to_np(h_mc_list[0])[0]
+    mc_components = _build_mc_components(h_mc_list, mc_items, warn=warn)
+    data = th1_to_np(h_data) if h_data is not None else None
+    return edges, mc_components, data
+
+
+def render_task(task):
+    """Render one plot from pre-converted numpy data. Runs in subprocess."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import mplhep as hep
+
+    ptype = task["type"]
+    outpath = task["outpath"]
+    xlabel = task["xlabel"]
+    lumi = task["lumi"]
+    edges = task["edges"]
+    mc_components = task["mc_components"]
+    data_tuple = task.get("data")
+    overwrite = task.get("overwrite", True)
+
+    import os
+    if not overwrite and os.path.exists(outpath):
+        return outpath
+    os.makedirs(os.path.dirname(outpath), exist_ok=True)
+
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    widths = np.diff(edges)
+    data_vals = data_tuple[1] if data_tuple else None
+    data_errs = data_tuple[2] if data_tuple else None
+
+    if ptype == "stacked":
+        fig, ax = plt.subplots(figsize=(8, 6))
+        stack_total = _draw_mc_stack(ax, centers, widths, mc_components)
+        _draw_mc_stat_unc(ax, edges, stack_total, mc_components)
+        if data_vals is not None:
+            _draw_data(ax, centers, data_vals, data_errs)
+        ax.set_ylabel("Events")
+        ax.grid(True, axis="both", alpha=0.25)
+        ax.legend(ncol=2)
+        ax.set_yscale("log")
+        ymax = float(np.max(stack_total)) if len(stack_total) else 1.0
+        if data_vals is not None:
+            ymax = max(ymax, float(np.max(data_vals)))
+        ax.set_ylim(0.5, max(10.0, 5.0 * ymax))
+        xlabel_ax = ax
+
+    elif ptype == "shape":
+        fig, ax = plt.subplots(figsize=(8, 6))
+        for comp in mc_components:
+            item = comp["item"]
+            vals = comp["vals"]
+            area = float(np.sum(vals * widths))
+            norm_vals = vals / area if area > 0 else vals
+            ax.step(edges, np.r_[norm_vals, norm_vals[-1]], where="post",
+                    linewidth=1.5, color=item["color"], label=item["label"])
+        if data_vals is not None:
+            area_d = float(np.sum(data_vals * widths))
+            if area_d > 0:
+                ax.errorbar(centers, data_vals / area_d, yerr=data_errs / area_d,
+                            fmt="o", color="black", label="Data", ms=4, capsize=2, zorder=10)
+        ax.set_ylabel("Normalised to unity")
+        ax.grid(True, axis="both", alpha=0.25)
+        ax.legend()
+        xlabel_ax = ax
+
+    elif ptype in ("sig", "cum_sig"):
+        # ── Shared two-panel top: stacked MC ──
+        fig = plt.figure(figsize=(8, 8))
+        gs = fig.add_gridspec(2, 1, height_ratios=[3, 1], hspace=0.05)
+        ax = fig.add_subplot(gs[0])
+        rax = fig.add_subplot(gs[1], sharex=ax)
+        stack_total = _draw_mc_stack(ax, centers, widths, mc_components)
+        _draw_mc_stat_unc(ax, edges, stack_total, mc_components)
+        if data_vals is not None:
+            _draw_data(ax, centers, data_vals, data_errs)
+        ax.set_ylabel("Events")
+        ax.grid(True, axis="both", alpha=0.25)
+        ax.legend(ncol=2, fontsize=10)
+        ax.tick_params(labelbottom=False)
+        ax.set_yscale("log")
+        ymax = float(np.max(stack_total)) if len(stack_total) else 1.0
+        ax.set_ylim(0.5, max(10.0, 5.0 * ymax))
+
+        # ── Separate S and B from mc_components ──
+        sig_indices = task.get("sig_indices", [])
+        bkg_indices = task.get("bkg_indices", [])
+        sig_total = np.zeros_like(centers)
+        bkg_total = np.zeros_like(centers)
+        for i, comp in enumerate(mc_components):
+            if i in sig_indices:
+                sig_total += comp["vals"]
+            elif i in bkg_indices:
+                bkg_total += comp["vals"]
+
+        # ── Bottom panel: bin-by-bin or cumulative S/√B ──
+        if ptype == "sig":
+            with np.errstate(divide="ignore", invalid="ignore"):
+                ratio_vals = np.where(bkg_total > 0, sig_total / np.sqrt(bkg_total), 0.0)
+            rax.set_ylabel(r"$S/\sqrt{B}$")
+        else:  # cum_sig — both directions
+            # Right-to-left: keep events > x
+            sig_r = np.cumsum(sig_total[::-1])[::-1]
+            bkg_r = np.cumsum(bkg_total[::-1])[::-1]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                cum_r = np.where(bkg_r > 0, sig_r / np.sqrt(bkg_r), 0.0)
+            # Left-to-right: keep events < x
+            sig_l = np.cumsum(sig_total)
+            bkg_l = np.cumsum(bkg_total)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                cum_l = np.where(bkg_l > 0, sig_l / np.sqrt(bkg_l), 0.0)
+
+            rax.step(edges, np.r_[cum_r, cum_r[-1]], where="post",
+                     color="tab:red", linewidth=1.5, label=r"cut $>x$")
+            rax.step(edges, np.r_[cum_l, cum_l[-1]], where="post",
+                     color="tab:blue", linewidth=1.5, label=r"cut $<x$")
+            ratio_vals = np.maximum(cum_r, cum_l)
+            rax.set_ylabel(r"Cumulative $S/\sqrt{B}$")
+            rax.legend(loc="upper right", fontsize=9)
+
+        if ptype == "sig":
+            rax.step(edges, np.r_[ratio_vals, ratio_vals[-1]], where="post",
+                     color="tab:red", linewidth=1.5)
+        rax.grid(True, axis="both", alpha=0.25)
+        rax.set_ylim(0, max(0.1, 1.5 * float(np.max(ratio_vals))) if np.any(ratio_vals > 0) else 1)
+        xlabel_ax = rax
+    else:
+        return outpath
+
+    xlabel_ax.set_xlabel(xlabel)
+    hep.cms.label("Work in Progress", ax=ax, data=True,
+                  lumi=f"{lumi:.4g}" if lumi is not None else None,
+                  year="2024", com=13.6)
+    if ptype in ("sig", "cum_sig"):
+        fig.subplots_adjust(hspace=0.05)
+    else:
+        fig.tight_layout()
+    fig.savefig(outpath, dpi=150)
+    plt.close(fig)
+    return outpath

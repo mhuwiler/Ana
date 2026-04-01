@@ -1,20 +1,29 @@
-# Interactive cuts — edit and re-run to see effect on plots.
-# Each entry is a C++ expression applied as an RDataFrame Filter.
-# Comment out or remove a line to disable that cut.
+# Analysis cuts — per-channel cards with named cuts.
 #
-# These cuts are applied AFTER the standard preselection
-# (≥4 jets, pT > 20, etc.) and AFTER all Define() columns are built,
-# so you can use any defined variable (ak8_Hbb_score, HT, nFatJets, etc.)
+# Format: key = cut name, value = C++ expression
+# CUTS = "tauhtauh"   → loads common + tauhtauh
+# CUTS = []           → no cuts
 #
-# Examples:
-#   - "ak8_Hbb_score > 0.5"
-#   - "ak8_Htt_score > 0.3"
-#   - "nFatJets >= 2"
-#   - "HT > 500"
-#   - "b0_score > 0.3"
+# Comment out a line to disable that cut.
 
-cuts:
-  - "nFatJets >= 2"
-  - "ak8_Hbb_mass < 150"
-  - "ak8_Htt_mass < 150"
-  - "ak8_dR_Hbb_Htt < 0.8 || (ak8_dR_Hbb_Htt > 2.5 && ak8_dR_Hbb_Htt < 3.5)"
+common:
+  min_jets: "nJets >= 2"
+  b_coi0_score: "b_coi0_score > 0.6"
+  b_coi1_score: "b_coi1_score > 0.6"
+  tau_coi0_score: "tau_coi0_score > 0.3"
+  tau_coi1_score: "tau_coi1_score > 0.3"
+  mbb_window: "mbb_coi > 70 && mbb_coi < 150"
+  mtautau_window: "mtautau_coi > 50 && mtautau_coi < 150"
+
+tauhtauh:
+  # Require 4 jets
+
+taumutauh:
+  # muon_req: "nMuons >= 1"
+  # TODO: Require 3 jets 
+  # 1. Tag b jets (2 jets)
+  # 2. Tag tau jets (1 or 2 jets)
+  # 3. Muon non-leading jet (priority): not within the b jets dr
+
+tauetauh:
+  # electron_req: "nElectrons >= 1"

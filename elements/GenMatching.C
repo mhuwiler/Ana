@@ -483,4 +483,35 @@ int GlobalDecayMode(
     return GlobalDecayMode(pdgId, m, f);
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  genMatchToRecoJet — match a gen particle to closest reco jet within dR
+// ═════════════════════════════════════════════════════════════════════════════
+
+int genMatchToRecoJet(int genIdx,
+                      const ROOT::RVec<float>& genPt,
+                      const ROOT::RVec<float>& genEta,
+                      const ROOT::RVec<float>& genPhi,
+                      const ROOT::RVec<float>& genMass,
+                      const ROOT::RVec<float>& recoPt,
+                      const ROOT::RVec<float>& recoEta,
+                      const ROOT::RVec<float>& recoPhi,
+                      const ROOT::RVec<float>& recoMass,
+                      float drThreshold = 0.4f) {
+    if (genIdx < 0 || genIdx >= (int)genPt.size()) return -1;
+    TLorentzVector gen;
+    gen.SetPtEtaPhiM(genPt[genIdx], genEta[genIdx], genPhi[genIdx], genMass[genIdx]);
+    double bestDR = drThreshold;
+    int best = -1;
+    for (int i = 0; i < (int)recoPt.size(); i++) {
+        TLorentzVector reco;
+        reco.SetPtEtaPhiM(recoPt[i], recoEta[i], recoPhi[i], recoMass[i]);
+        double dR = gen.DeltaR(reco);
+        if (dR < bestDR) {
+            bestDR = dR;
+            best = i;
+        }
+    }
+    return best;
+}
+
 } // namespace Ana

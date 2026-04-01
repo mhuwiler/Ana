@@ -16,7 +16,7 @@ des/
 *_h_ACLiC_dict*
 
 # Plot output
-plots/
+plots*/
 
 # Python bytecode
 __pycache__/
@@ -27,5 +27,6 @@ __pycache__/
 
 # Build artifacts, logs, and output
 build/
-logs/
+logs*/
 output/
+wiki/
