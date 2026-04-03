@@ -1,0 +1,39 @@
+# Object-level quality cuts for lepton selection.
+#
+# These define what "has_good_muon" and "has_good_electron" mean.
+# Analysis-level cuts (mass windows, tau scores, ΔR cleaning) stay in cuts.yaml.
+#
+# Sources:
+#   [2] AN-2025/103 (HH→bbττ) Tables 6.7-6.8
+#   [7] CMS SWGuideMuonId TWiki (Tight Muon ID)
+#   [8] CMS SWGuideMuonIsolation TWiki
+#   [9] CMS EgammaPublicData TWiki (cut-based electron ID)
+#   [10] CMS-PAS-EXO-19-018 (dark photon scouting)
+#   [13] Legacy code: Ana/elements/RecoObjects.C
+
+muon:
+  pt_min: 20.0        # [GeV] — AN-2025/103 Table 6.7
+  eta_max: 2.4        # muon spectrometer coverage — AN-2025/103 Table 6.7
+  iso_max: 0.15       # (trackIso+ecalIso+hcalIso)/pT — CMS Muon Iso TWiki [8]
+  dxy_max: 0.045      # [cm] — AN-2025/103 Table 6.7
+  dz_max: 0.2         # [cm] — AN-2025/103 Table 6.7
+  # TODO: normchi2_max: 10.0    — CMS Tight ID [7]
+  # TODO: min_pixel_hits: 1     — CMS Tight ID [7], EXO-19-018 [10]
+  # TODO: min_tracker_layers: 6 — CMS Tight ID [7], EXO-19-018 [10]
+
+electron:
+  pt_min: 20.0        # [GeV] — matching muon threshold
+  eta_max: 2.5        # ECAL coverage
+  iso_max: 0.15       # (trackIso+ecalIso+hcalIso)/pT — CMS Muon Iso TWiki [8]
+  d0_max: 0.045       # [cm] — AN-2025/103 Table 6.8
+  dz_max: 0.2         # [cm] — AN-2025/103 Table 6.8
+  
+  crack_lo: 1.4442    # barrel-endcap transition (veto)
+  crack_hi: 1.566
+  # TODO: hoe_max: 0.15              — CMS cut-based ID [9]
+  # TODO: sieta_barrel: 0.011        — CMS Loose ID [9]
+  # TODO: sieta_endcap: 0.031        — CMS Loose ID [9]
+  # TODO: deta_barrel: 0.007         — CMS Loose ID [9]
+  # TODO: deta_endcap: 0.009         — CMS Loose ID [9]
+  # TODO: dphi_barrel: 0.15          — CMS Loose ID [9]
+  # TODO: dphi_endcap: 0.10          — CMS Loose ID [9]

@@ -265,6 +265,80 @@ def define_kinematics(df):
     return df
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Lepton selection (muon + electron for τμτh and τeτh channels)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def define_lepton_selection(df, obj_cfg):
+    """Select best muon and electron using cuts from config/objects.yaml.
+
+    Defines: mu_idx, mu_pt, mu_eta, mu_phi, mu_relIso, has_good_muon
+             el_idx, el_pt, el_eta, el_phi, el_relIso, has_good_electron
+             dR_mu_tau, dR_el_tau
+    """
+    _MU = "ScoutingMuonVtx"
+    _EL = "ScoutingElectron"
+
+    mu = obj_cfg.get("muon", {})
+    el = obj_cfg.get("electron", {})
+
+    # ── Muon selection ──
+    df = df.Define("mu_idx",
+        f"Ana::SelectMuon({_MU}_pt, {_MU}_eta, "
+        f"{_MU}_trackIso, {_MU}_ecalIso, {_MU}_hcalIso, "
+        f"{_MU}_trk_dxy, {_MU}_trk_dz, "
+        f"{mu.get('pt_min', 20.0)}f, {mu.get('eta_max', 2.4)}f, "
+        f"{mu.get('iso_max', 0.15)}f, "
+        f"{mu.get('dxy_max', 0.045)}f, {mu.get('dz_max', 0.2)}f)")
+
+    df = (df
+        .Define("has_good_muon", "mu_idx >= 0")
+        .Define("mu_pt",  f"mu_idx >= 0 ? {_MU}_pt[mu_idx] : -1.f")
+        .Define("mu_eta", f"mu_idx >= 0 ? {_MU}_eta[mu_idx] : -99.f")
+        .Define("mu_phi", f"mu_idx >= 0 ? {_MU}_phi[mu_idx] : -99.f")
+        .Define("mu_relIso",
+            f"mu_idx >= 0 && {_MU}_pt[mu_idx] > 0 ? "
+            f"(float)(({_MU}_trackIso[mu_idx] + {_MU}_ecalIso[mu_idx] + {_MU}_hcalIso[mu_idx]) "
+            f"/ {_MU}_pt[mu_idx]) : -1.f")
+    )
+
+    # ── Electron selection ──
+    df = df.Define("el_idx",
+        f"Ana::SelectElectron({_EL}_pt, {_EL}_eta, "
+        f"{_EL}_trackIso, {_EL}_ecalIso, {_EL}_hcalIso, "
+        f"{_EL}_bestTrack_d0, {_EL}_bestTrack_dz, "
+        f"{el.get('pt_min', 20.0)}f, {el.get('eta_max', 2.5)}f, "
+        f"{el.get('crack_lo', 1.4442)}f, {el.get('crack_hi', 1.566)}f, "
+        f"{el.get('iso_max', 0.15)}f, "
+        f"{el.get('d0_max', 0.045)}f, {el.get('dz_max', 0.2)}f)")
+
+    df = (df
+        .Define("has_good_electron", "el_idx >= 0")
+        .Define("el_pt",  f"el_idx >= 0 ? {_EL}_pt[el_idx] : -1.f")
+        .Define("el_eta", f"el_idx >= 0 ? {_EL}_eta[el_idx] : -99.f")
+        .Define("el_phi", f"el_idx >= 0 ? {_EL}_phi[el_idx] : -99.f")
+        .Define("el_relIso",
+            f"el_idx >= 0 && {_EL}_pt[el_idx] > 0 ? "
+            f"(float)(({_EL}_trackIso[el_idx] + {_EL}_ecalIso[el_idx] + {_EL}_hcalIso[el_idx]) "
+            f"/ {_EL}_pt[el_idx]) : -1.f")
+    )
+
+    # ── ΔR(lepton, tau COI candidate) ──
+    # tau_coi0 is the leading tau COI candidate (defined in define_tau_candidates)
+    df = (df
+        .Define("dR_mu_tau",
+            "mu_idx >= 0 && tau_coi0_pt > 0 ? "
+            "(float)sqrt(pow(mu_eta - tau_coi0_eta, 2) + "
+            "pow(TVector2::Phi_mpi_pi(mu_phi - tau_coi0_phi), 2)) : -1.f")
+        .Define("dR_el_tau",
+            "el_idx >= 0 && tau_coi0_pt > 0 ? "
+            "(float)sqrt(pow(el_eta - tau_coi0_eta, 2) + "
+            "pow(TVector2::Phi_mpi_pi(el_phi - tau_coi0_phi), 2)) : -1.f")
+    )
+
+    return df
+
+
 _DATA_AK4 = "ScoutingPFJetRecluster"
 
 

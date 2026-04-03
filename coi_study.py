@@ -10,7 +10,7 @@ NTHREADS     = 32
 NPLOT_WORKERS = 8
 THEME        = "light"
 OVERWRITE    = True
-MAX_MC_FILES = 1
+MAX_MC_FILES = 3
 MAX_EVENTS   = None
 
 # Each entry: (trigger, [cut cards from cuts.yaml])
@@ -61,6 +61,6 @@ if __name__ == '__main__':
     result = load_and_run(ctx, PLOT_VARS)
     result.plot.stacked()
     result.plot.stacked(ratio="significance")
-    result.plot.stacked(ratio="cum_significance")
+    result.plot.stacked(ratio="cuml_significance")
     result.plot.shapes()
 

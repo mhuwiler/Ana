@@ -321,7 +321,7 @@ class Plotter:
         Parameters
         ----------
         ratio : str or None
-            "efficiency", "significance", or "cum_significance" — adds a ratio panel below.
+            "efficiency", "significance", or "cuml_significance" — adds a ratio panel below.
         vars : list[str] or None
             Variable names to plot. None = all.
         triggers : list[str] or None
@@ -339,7 +339,7 @@ class Plotter:
             do_stacked=True, do_shape=False,
             do_efficiency=(ratio == "efficiency"),
             do_significance=(ratio == "significance"),
-            do_cum_significance=(ratio == "cum_significance"),
+            do_cuml_significance=(ratio == "cuml_significance"),
             n_workers=r.ctx.nplot_workers)
 
     def shapes(self, vars=None, triggers=None):
@@ -378,7 +378,7 @@ class Plotter:
             do_stacked=True, do_shape=True,
             do_efficiency=(ratio == "efficiency"),
             do_significance=(ratio == "significance" or ratio == "data_mc"),
-            do_cum_significance=(ratio == "cum_significance"))
+            do_cuml_significance=(ratio == "cuml_significance"))
 
     def trigger_overlays(self, vars=None):
         """Same variable across triggers on one plot."""

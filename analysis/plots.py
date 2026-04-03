@@ -76,7 +76,7 @@ def _plot_var(var_name, xlabel, h_mc_list, mc_items, mc_denom_hists,
               sig_indices, bkg_indices, trig_has_expr,
               lumi, plot_dir, category, trig_name, overwrite,
               do_stacked, do_shape, do_efficiency=False, do_significance=False,
-              do_cum_significance=False,
+              do_cuml_significance=False,
               h_data=None, data_denom_hists=None):
     """Generate plot types for one variable x one trigger."""
 
@@ -108,12 +108,12 @@ def _plot_var(var_name, xlabel, h_mc_list, mc_items, mc_denom_hists,
                   _plot_path(plot_dir, category, "sig", trig_name, var_name), overwrite,
                   cms_ax=ax)
 
-    if do_cum_significance:
+    if do_cuml_significance:
         fig, ax, rax = plot_stacked_with_cumulative_significance(
             h_mc_list, mc_items, h_data=h_data,
             sig_indices=sig_indices, bkg_indices=bkg_indices, logy=True)
         _save_fig(fig, rax, xlabel, lumi,
-                  _plot_path(plot_dir, category, "cum_sig", trig_name, var_name), overwrite,
+                  _plot_path(plot_dir, category, "cuml_sig", trig_name, var_name), overwrite,
                   cms_ax=ax)
 
 
@@ -172,7 +172,7 @@ def plot_mc_distributions(trig_selections, mc_hists_by_trig, mc_denom_hists,
                           sig_modes, decay_modes,
                           lumi, plot_dir, overwrite, do_stacked, do_shape,
                           do_efficiency=False, do_significance=False,
-                          do_cum_significance=False,
+                          do_cuml_significance=False,
                           n_workers=1):
     """MC-only plots: stacked, shape, and optionally efficiency/significance.
 
@@ -211,9 +211,9 @@ def plot_mc_distributions(trig_selections, mc_hists_by_trig, mc_denom_hists,
             if do_significance:
                 tasks.append({**base, "type": "sig",
                               "outpath": _plot_path(plot_dir, "mc", "sig", trig_name, var_name)})
-            if do_cum_significance:
-                tasks.append({**base, "type": "cum_sig",
-                              "outpath": _plot_path(plot_dir, "mc", "cum_sig", trig_name, var_name)})
+            if do_cuml_significance:
+                tasks.append({**base, "type": "cuml_sig",
+                              "outpath": _plot_path(plot_dir, "mc", "cuml_sig", trig_name, var_name)})
             if do_efficiency and sel["trig"] is not None:
                 # Efficiency still uses sequential path (needs ROOT TEfficiency)
                 _plot_var(var_name, xlabel, h_mc_list, mc_items, mc_denom_hists,
@@ -398,7 +398,7 @@ def plot_data_mc(trig_selections, mc_hists_by_trig, mc_denom_hists,
                  mc_items_by_trig, plot_vars, sig_indices, bkg_indices,
                  lumi, plot_dir, overwrite, do_stacked, do_shape,
                  do_efficiency=False, do_significance=False,
-                 do_cum_significance=False):
+                 do_cuml_significance=False):
     """MC+Data overlay plots."""
     for trig_name in trig_selections:
         h_by_var = mc_hists_by_trig[trig_name]
@@ -414,7 +414,7 @@ def plot_data_mc(trig_selections, mc_hists_by_trig, mc_denom_hists,
                       sig_indices, bkg_indices, trig_selections[trig_name]["trig"] is not None,
                       lumi, plot_dir, "data", trig_name, overwrite, do_stacked, do_shape,
                       do_efficiency=do_efficiency, do_significance=do_significance,
-                      do_cum_significance=do_cum_significance,
+                      do_cuml_significance=do_cuml_significance,
                       h_data=h_data, data_denom_hists=data_denom_hists)
 
         # mHH comparison with data

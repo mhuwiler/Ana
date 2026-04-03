@@ -6,7 +6,7 @@
 
 ### 2026-04-01
 
-- Added cumulative S/√B plots (`cum_sig/` directory, `ratio="cum_significance"`)
+- Added cumulative S/√B plots (`cuml_sig/` directory, `ratio="cuml_significance"`)
   - Right-to-left integral: for each bin edge x, integrate S and B from x to ∞
   - Both standalone function and parallel `render_task` path
 - Fixed parallel plotting: `ProcessPoolExecutor` with `spawn` context
@@ -14,10 +14,10 @@
   - Moved heavy imports (`analysis.runner`) inside guard so spawn workers stay lightweight
   - Removed top-level `import ROOT` from `utils/plotting.py` (workers don't need ROOT)
   - Emptied `utils/__init__.py` to prevent eager import chain
-- Fixed CMS label overlapping between panels in two-panel plots (sig, cum_sig, eff)
+- Fixed CMS label overlapping between panels in two-panel plots (sig, cuml_sig, eff)
 - Fixed `tight_layout` warning for gridspec figures
 - Condensed negative-yield warnings to single summary line per trigger (was 20+ lines)
-- Extracted `_setup_significance_figure()` helper to deduplicate sig/cum_sig code
+- Extracted `_setup_significance_figure()` helper to deduplicate sig/cuml_sig code
 - Cleaned up `skim.py` to reuse `collect_all_expressions()` from `utils/skim.py`
 - Created Foam wiki (`wiki/`) with 16 interconnected notes
 - Added `.vscode/` config for Foam extension

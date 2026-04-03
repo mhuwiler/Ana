@@ -5,7 +5,7 @@ import yaml
 
 from utils.data import limit_files, load_scouting_data
 from utils.skim import load_slim_or_eos
-from analysis.definitions import define_gen_columns, define_kinematics, define_gen_matched_ak4, define_coi_matching
+from analysis.definitions import define_gen_columns, define_kinematics, define_gen_matched_ak4, define_coi_matching, define_lepton_selection
 
 
 def _extract_named_cuts(section):
@@ -180,11 +180,15 @@ def load_mc_samples(group_files_by_sample, xsec, max_events, args, rdf_exprs=Non
     if needs_define:
         mc_need = {n: mc[n] for n in needs_define}
         sig_need = [s for s in sig_samples if s in needs_define]
+        from analysis.config import load_objects_config
+        obj_cfg = load_objects_config()
         define_gen_columns(mc_need, sig_need)
         for name in mc_need:
             mc_need[name] = define_kinematics(mc_need[name])
         define_gen_matched_ak4(mc_need, sig_need)
         define_coi_matching(mc_need, sig_need)
+        for name in mc_need:
+            mc_need[name] = define_lepton_selection(mc_need[name], obj_cfg)
         mc.update(mc_need)
 
         # Snapshot everything to slim

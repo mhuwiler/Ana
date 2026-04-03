@@ -264,6 +264,28 @@ def collect_all_expressions():
     exprs.append(f"{AK8_SGP}_massCorrGeneric")
     exprs.append(f"{AK8_SGP}_massCorrResonance")
 
+    # Lepton branches (for τμτh and τeτh channels)
+    _MU = "ScoutingMuonVtx"
+    for suffix in ["pt", "eta", "phi", "m", "charge",
+                    "trackIso", "ecalIso", "hcalIso",
+                    "trk_dxy", "trk_dz", "normchi2",
+                    "nValidPixelHits", "nTrackerLayersWithMeasurement",
+                    "nRecoMuonMatchedStations"]:
+        exprs.append(f"{_MU}_{suffix}")
+    exprs.append(f"n{_MU}")
+
+    _EL = "ScoutingElectron"
+    for suffix in ["pt", "eta", "phi", "m",
+                    "trackIso", "ecalIso", "hcalIso",
+                    "hOverE", "sigmaIetaIeta", "dEtaIn", "dPhiIn",
+                    "bestTrack_d0", "bestTrack_dz", "bestTrack_charge",
+                    "missingHits", "ooEMOop"]:
+        exprs.append(f"{_EL}_{suffix}")
+    exprs.append(f"n{_EL}")
+
+    # MET (for transverse mass)
+    exprs.append("ScoutingMET_pt ScoutingMET_phi")
+
     return exprs
 
 

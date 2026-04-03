@@ -75,7 +75,7 @@ Three trigger paths analyzed in parallel:
 | Per-channel overlay | Signal-only per decay channel | `overlay/{ch}_{var}.png` |
 | Eff stacked | Stacked + trigger efficiency panel | `eff/{trig}/{var}.png` |
 | Sig stacked | Stacked + bin-by-bin S/√B panel | `sig/{trig}/{var}.png` |
-| Cum sig | Stacked + cumulative S/√B (right-to-left) | `cum_sig/{trig}/{var}.png` |
+| Cum sig | Stacked + cumulative S/√B (right-to-left) | `cuml_sig/{trig}/{var}.png` |
 
 
 ## Code Architecture

@@ -120,4 +120,101 @@ DijetPair findDijetInWindow(
     return best;
 }
 
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Muon selection  (ScoutingMuonVtx collection)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Selects the highest-pT ScoutingMuonVtx passing quality cuts.
+// Returns collection index or -1 if none pass.
+//
+// Uses combined relative isolation: (trackIso + ecalIso + hcalIso) / pT
+//
+// Sources:
+//   AN-2025/103 Table 6.7 (pT, eta, dxy, dz)
+//   CMS SWGuideMuonIsolation TWiki (combined isolation)
+//   Legacy code: Ana/elements/RecoObjects.C (SelectMuon)
+//
+// TODO: Add normchi2 < 10         [CMS Tight ID, EXO-19-018]
+// TODO: Add nValidPixelHits > 0   [CMS Tight ID, EXO-19-018]
+// TODO: Add nTrackerLayers > 5    [CMS Tight ID, EXO-19-018]
+//
+int SelectMuon(
+    const ROOT::RVec<float>& pt,
+    const ROOT::RVec<float>& eta,
+    const ROOT::RVec<float>& trackIso,
+    const ROOT::RVec<float>& ecalIso,
+    const ROOT::RVec<float>& hcalIso,
+    const ROOT::RVec<float>& trk_dxy,
+    const ROOT::RVec<float>& trk_dz,
+    float pt_min,
+    float eta_max,
+    float iso_max,
+    float dxy_max,
+    float dz_max)
+{
+    int best = -1;
+    float best_pt = -1.f;
+    for (int i = 0; i < (int)pt.size(); ++i) {
+        if (pt[i]                  < pt_min)  continue;
+        if (std::abs(eta[i])       > eta_max) continue;
+        if (pt[i] > 0 && (trackIso[i] + ecalIso[i] + hcalIso[i]) / pt[i] > iso_max) continue;
+        if (std::abs(trk_dxy[i])   > dxy_max) continue;
+        if (std::abs(trk_dz[i])    > dz_max)  continue;
+        if (pt[i] > best_pt) { best_pt = pt[i]; best = i; }
+    }
+    return best;
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Electron selection  (ScoutingElectron collection)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Selects the highest-pT ScoutingElectron passing quality cuts.
+// ECAL crack (crack_lo < |eta| < crack_hi) is excluded.
+// Uses combined relative isolation: (trackIso + ecalIso + hcalIso) / pT
+//
+// Sources:
+//   AN-2025/103 Table 6.8 (pT, eta, d0, dz)
+//   CMS EgammaPublicData TWiki (crack veto)
+//   Legacy code: Ana/elements/RecoObjects.C (SelectElectron)
+//
+// TODO: Add hOverE < 0.15                          [CMS cut-based ID]
+// TODO: Add sigmaIetaIeta barrel < 0.011 / endcap < 0.031  [CMS Loose ID]
+// TODO: Add |dEtaIn| barrel < 0.007 / endcap < 0.009       [CMS Loose ID]
+// TODO: Add |dPhiIn| barrel < 0.15 / endcap < 0.10         [CMS Loose ID]
+//
+int SelectElectron(
+    const ROOT::RVec<float>& pt,
+    const ROOT::RVec<float>& eta,
+    const ROOT::RVec<float>& trackIso,
+    const ROOT::RVec<float>& ecalIso,
+    const ROOT::RVec<float>& hcalIso,
+    const ROOT::RVec<float>& bestTrack_d0,
+    const ROOT::RVec<float>& bestTrack_dz,
+    float pt_min,
+    float eta_max,
+    float crack_lo,
+    float crack_hi,
+    float iso_max,
+    float d0_max,
+    float dz_max)
+{
+    int best = -1;
+    float best_pt = -1.f;
+    for (int i = 0; i < (int)pt.size(); ++i) {
+        float aeta = std::abs(eta[i]);
+        if (pt[i]  < pt_min)  continue;
+        if (aeta   > eta_max) continue;
+        if (aeta > crack_lo && aeta < crack_hi) continue;  // ECAL crack veto
+        if (pt[i] > 0 && (trackIso[i] + ecalIso[i] + hcalIso[i]) / pt[i] > iso_max) continue;
+        if (std::abs(bestTrack_d0[i]) > d0_max) continue;
+        if (std::abs(bestTrack_dz[i]) > dz_max) continue;
+        if (pt[i] > best_pt) { best_pt = pt[i]; best = i; }
+    }
+    return best;
+}
+
+
 } // namespace Ana

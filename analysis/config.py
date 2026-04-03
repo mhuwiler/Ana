@@ -27,6 +27,17 @@ def _load_yaml(path):
         return yaml.safe_load(f) or {}
 
 
+def load_objects_config(config_dir="config"):
+    """Load object quality cuts from config/objects.yaml.
+
+    Returns dict with 'muon' and 'electron' sub-dicts containing cut values.
+    """
+    path = os.path.join(config_dir, "objects.yaml")
+    if not os.path.exists(path):
+        return {"muon": {}, "electron": {}}
+    return _load_yaml(path)
+
+
 def load_analysis_config(config_dir="config"):
     """Load decay modes from config/analysis.yaml.
 

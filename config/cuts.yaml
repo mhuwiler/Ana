@@ -4,7 +4,8 @@
 # CUTS = ["common", "tauhtauh"]  → merges common + tauhtauh
 # CUTS = []                      → no cuts
 #
-# Comment out a line to disable that cut.
+# Object-level lepton quality (pT, iso, dxy, dz) is in config/objects.yaml.
+# These define has_good_muon / has_good_electron via Ana::SelectMuon/Electron.
 
 common:
   min_jets: "nJets >= 2"
@@ -18,13 +19,15 @@ tauhtauh:
   mtautau_window: "mtautau_coi > 50 && mtautau_coi < 150"
 
 taumutauh:
+  has_muon: "has_good_muon"
+  dR_mu_tau: "dR_mu_tau > 0.5"
   tau_coi0_score: "tau_coi0_score > 0.3"
-  muon_req: "nMuons >= 1"
   mbb_window: "mbb_coi > 70 && mbb_coi < 150"
   mtautau_window: "mtautau_coi > 30 && mtautau_coi < 150"
 
 tauetauh:
+  has_electron: "has_good_electron"
+  dR_el_tau: "dR_el_tau > 0.5"
   tau_coi0_score: "tau_coi0_score > 0.3"
-  electron_req: "nElectrons >= 1"
   mbb_window: "mbb_coi > 70 && mbb_coi < 150"
   mtautau_window: "mtautau_coi > 30 && mtautau_coi < 150"

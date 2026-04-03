@@ -149,7 +149,7 @@ def _build_mc_components(h_mc_list, mc_items, sort_by_yield=True, warn=True):
     """Convert MC histograms (TH1 objects) to numpy arrays (vals, errs), optionally sorted."""
     components = []
     neg_groups = []
-    for h, item in zip(h_mc_list, mc_items):
+    for idx, (h, item) in enumerate(zip(h_mc_list, mc_items)):
         _, vals_raw, errs_raw = th1_to_np(h)
         if np.any(vals_raw < 0):
             neg_groups.append(item['label'])
@@ -159,6 +159,7 @@ def _build_mc_components(h_mc_list, mc_items, sort_by_yield=True, warn=True):
             "vals": vals_clipped,
             "errs": errs_raw,
             "yield": float(np.sum(vals_clipped)),
+            "orig_idx": idx,
         })
 
     if warn and neg_groups:
@@ -428,33 +429,32 @@ def plot_stacked_with_cumulative_significance(
         sig_indices=sig_indices, bkg_indices=bkg_indices,
         logy=logy, sort_mc_by_yield=sort_mc_by_yield, title=title)
 
-    # Sum signal across channels
-    sig_vals = np.zeros_like(centers)
+    # Per-channel, both directions
+    bkg_r = np.cumsum(bkg_vals[::-1])[::-1]
+    bkg_l = np.cumsum(bkg_vals)
     for si in sig_indices:
         _, sv, _ = th1_to_np(h_mc_list[si])
-        sig_vals += np.maximum(sv, 0.0)
+        sv = np.maximum(sv, 0.0)
+        item = mc_items[si]
 
-    # Right-to-left: keep events > x
-    sig_r = np.cumsum(sig_vals[::-1])[::-1]
-    bkg_r = np.cumsum(bkg_vals[::-1])[::-1]
-    with np.errstate(divide="ignore", invalid="ignore"):
-        cum_r = np.where(bkg_r > 0, sig_r / np.sqrt(bkg_r), 0.0)
+        sig_r = np.cumsum(sv[::-1])[::-1]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            cum_r = np.where(bkg_r > 0, sig_r / np.sqrt(bkg_r), 0.0)
+        sig_l = np.cumsum(sv)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            cum_l = np.where(bkg_l > 0, sig_l / np.sqrt(bkg_l), 0.0)
 
-    # Left-to-right: keep events < x
-    sig_l = np.cumsum(sig_vals)
-    bkg_l = np.cumsum(bkg_vals)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        cum_l = np.where(bkg_l > 0, sig_l / np.sqrt(bkg_l), 0.0)
-
-    rax.step(centers, cum_r, where="mid", linewidth=1.5,
-             color="tab:red", label=r"cut $>x$")
-    rax.step(centers, cum_l, where="mid", linewidth=1.5,
-             color="tab:blue", label=r"cut $<x$")
+        rax.step(centers, cum_r, where="mid", linewidth=1.5,
+                 color=item["color"], linestyle="-",
+                 label=f'{item["label"]} $>x$')
+        rax.step(centers, cum_l, where="mid", linewidth=1.5,
+                 color=item["color"], linestyle="--",
+                 label=f'{item["label"]} $<x$')
 
     rax.set_ylabel(r"Cumulative $S\,/\,\sqrt{B}$")
     rax.set_ylim(bottom=0)
     rax.grid(True, axis="y", alpha=0.3)
-    rax.legend(loc="upper right", fontsize=9)
+    rax.legend(loc="upper right", fontsize=7, ncol=2)
     return fig, ax, rax
 
 
@@ -739,7 +739,7 @@ def render_task(task):
         ax.legend()
         xlabel_ax = ax
 
-    elif ptype in ("sig", "cum_sig"):
+    elif ptype in ("sig", "cuml_sig"):
         # ── Shared two-panel top: stacked MC ──
         fig = plt.figure(figsize=(8, 8))
         gs = fig.add_gridspec(2, 1, height_ratios=[3, 1], hspace=0.05)
@@ -758,46 +758,52 @@ def render_task(task):
         ax.set_ylim(0.5, max(10.0, 5.0 * ymax))
 
         # ── Separate S and B from mc_components ──
-        sig_indices = task.get("sig_indices", [])
-        bkg_indices = task.get("bkg_indices", [])
-        sig_total = np.zeros_like(centers)
+        # Use orig_idx to match against pre-sort sig/bkg indices
+        sig_indices = set(task.get("sig_indices", []))
+        bkg_indices = set(task.get("bkg_indices", []))
+        sig_comps = []  # [(vals, item), ...] per signal channel
         bkg_total = np.zeros_like(centers)
-        for i, comp in enumerate(mc_components):
-            if i in sig_indices:
-                sig_total += comp["vals"]
-            elif i in bkg_indices:
+        for comp in mc_components:
+            oi = comp.get("orig_idx", -1)
+            if oi in sig_indices:
+                sig_comps.append((comp["vals"], comp["item"]))
+            elif oi in bkg_indices:
                 bkg_total += comp["vals"]
 
         # ── Bottom panel: bin-by-bin or cumulative S/√B ──
+        all_ratio_vals = []
         if ptype == "sig":
-            with np.errstate(divide="ignore", invalid="ignore"):
-                ratio_vals = np.where(bkg_total > 0, sig_total / np.sqrt(bkg_total), 0.0)
+            for sv, item in sig_comps:
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    rv = np.where(bkg_total > 0, sv / np.sqrt(bkg_total), 0.0)
+                rax.step(edges, np.r_[rv, rv[-1]], where="post",
+                         linewidth=1.5, color=item["color"], label=item["label"])
+                all_ratio_vals.append(rv)
             rax.set_ylabel(r"$S/\sqrt{B}$")
-        else:  # cum_sig — both directions
-            # Right-to-left: keep events > x
-            sig_r = np.cumsum(sig_total[::-1])[::-1]
-            bkg_r = np.cumsum(bkg_total[::-1])[::-1]
-            with np.errstate(divide="ignore", invalid="ignore"):
-                cum_r = np.where(bkg_r > 0, sig_r / np.sqrt(bkg_r), 0.0)
-            # Left-to-right: keep events < x
-            sig_l = np.cumsum(sig_total)
-            bkg_l = np.cumsum(bkg_total)
-            with np.errstate(divide="ignore", invalid="ignore"):
-                cum_l = np.where(bkg_l > 0, sig_l / np.sqrt(bkg_l), 0.0)
-
-            rax.step(edges, np.r_[cum_r, cum_r[-1]], where="post",
-                     color="tab:red", linewidth=1.5, label=r"cut $>x$")
-            rax.step(edges, np.r_[cum_l, cum_l[-1]], where="post",
-                     color="tab:blue", linewidth=1.5, label=r"cut $<x$")
-            ratio_vals = np.maximum(cum_r, cum_l)
-            rax.set_ylabel(r"Cumulative $S/\sqrt{B}$")
             rax.legend(loc="upper right", fontsize=9)
+        else:  # cuml_sig — per channel, both directions
+            bkg_r = np.cumsum(bkg_total[::-1])[::-1]
+            bkg_l = np.cumsum(bkg_total)
+            for sv, item in sig_comps:
+                sig_r = np.cumsum(sv[::-1])[::-1]
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    cum_r = np.where(bkg_r > 0, sig_r / np.sqrt(bkg_r), 0.0)
+                sig_l = np.cumsum(sv)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    cum_l = np.where(bkg_l > 0, sig_l / np.sqrt(bkg_l), 0.0)
+                rax.step(edges, np.r_[cum_r, cum_r[-1]], where="post",
+                         linewidth=1.5, color=item["color"], linestyle="-",
+                         label=f'{item["label"]} $>x$')
+                rax.step(edges, np.r_[cum_l, cum_l[-1]], where="post",
+                         linewidth=1.5, color=item["color"], linestyle="--",
+                         label=f'{item["label"]} $<x$')
+                all_ratio_vals.extend([cum_r, cum_l])
+            rax.set_ylabel(r"Cumulative $S/\sqrt{B}$")
+            rax.legend(loc="upper right", fontsize=7, ncol=2)
 
-        if ptype == "sig":
-            rax.step(edges, np.r_[ratio_vals, ratio_vals[-1]], where="post",
-                     color="tab:red", linewidth=1.5)
         rax.grid(True, axis="both", alpha=0.25)
-        rax.set_ylim(0, max(0.1, 1.5 * float(np.max(ratio_vals))) if np.any(ratio_vals > 0) else 1)
+        peak = max((float(np.max(rv)) for rv in all_ratio_vals), default=0.0)
+        rax.set_ylim(0, max(peak * 1.3, 1e-6))
         xlabel_ax = rax
     else:
         return outpath
@@ -806,7 +812,7 @@ def render_task(task):
     hep.cms.label("Work in Progress", ax=ax, data=True,
                   lumi=f"{lumi:.4g}" if lumi is not None else None,
                   year="2024", com=13.6)
-    if ptype in ("sig", "cum_sig"):
+    if ptype in ("sig", "cuml_sig"):
         fig.subplots_adjust(hspace=0.05)
     else:
         fig.tight_layout()
