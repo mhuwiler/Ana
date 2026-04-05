@@ -44,6 +44,16 @@ PLOT_VARS = [
     PlotVar("mtautau_coi",   r"$m_{\tau\tau}$ COI [GeV]",     30, 0, 300),
     PlotVar("dR_bb_coi",     r"$\Delta R(b_{COI0}, b_{COI1})$",       30, 0, 6),
     PlotVar("dR_tautau_coi", r"$\Delta R(\tau_{COI0}, \tau_{COI1})$", 30, 0, 6),
+
+    # QCD rejection variables
+    PlotVar("score_product",    r"$b_0 \times b_1 \times \tau_0 \times \tau_1$", 50, 0, 1),
+    PlotVar("MET",              r"Scouting MET [GeV]",                           50, 0, 200),
+    PlotVar("MET_significance", r"MET$/\sqrt{H_T}$ [$\sqrt{\mathrm{GeV}}$]",    50, 0, 10),
+    PlotVar("MT_tau0_MET",      r"$M_T(\tau_0, \mathrm{MET})$ [GeV]",           40, 0, 200),
+    PlotVar("D_zeta",           r"$D_\zeta = p_\zeta - 0.85 p_\zeta^{vis}$ [GeV]", 50, -200, 100),
+    PlotVar("dphi_bb_tautau",   r"$|\Delta\phi(bb, \tau\tau)|$",                30, 0, 3.15),
+    PlotVar("dR_bb_tautau",     r"$\Delta R(bb, \tau\tau)$",                    30, 0, 6),
+    PlotVar("dphi_MET_tau0",    r"$|\Delta\phi(\mathrm{MET}, \tau_0)|$",        30, 0, 3.15),
 ]
 
 # ── Run ────────────────────────────────────────────────────────────────────────

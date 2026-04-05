@@ -19,6 +19,9 @@ pandas = "*"
 ipykernel = "*"
 seaborn = ">=0.13.2,<0.14"
 fpdf2 = ">=2.8.7,<3"
+scikit-learn = ">=1.8.0,<2"
+xgboost = ">=3.2.0,<4"
+pip = ">=26.0.1,<27"
 
 [pypi-dependencies]
 brilws = "*"

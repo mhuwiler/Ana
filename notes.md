@@ -4,6 +4,51 @@
 
 ## Activity Log
 
+### 2026-04-05
+
+- **BDT classifier runs** (XGBoost, GPU on A100):
+  - Run 1 (with QCD, 5 files): `scale_pos_weight = sum_bkg/sum_sig ≈ 1 billion` → BDT scored everything near 1.0, Z_A = 0.003 despite AUC = 0.999
+  - Fixed: normalize training weights so signal total = background total. Physics weights used only for significance scan.
+  - Run 2 (no QCD, lr=0.05, 1000 trees, depth=4): AUC = 0.923, Z_A = 0.055
+  - Run 3 (no QCD, lr=0.01, 3000 trees, depth=4): AUC = 0.920, Z_A = 0.073
+  - Run 4 (depth=10, lr=0.01, 10000 trees): AUC = 0.926, Z_A = 0.073 (early stopped at 3832)
+  - Run 5 (all 22 files per sample, depth=10, lr=0.01, 10000 trees): AUC = 0.885, Z_A = 0.063 — **no early stopping fired** (9995/10000), best threshold at 0.995
+
+- **Diagnosis**: `max_depth=10` overfits. Threshold at 0.995 = knife-edge discrimination. Val loss barely moves. Shallower trees (depth=4) generalize better.
+
+- **70/15/15 train/val/test split** implemented with `train_test_split()` from `utils/optimize.py`
+
+- **Training features**: loss curves, tqdm progress bar, GPU acceleration all working
+
+- **Comparison to nominal**: nominal analysis (AN-2025/103) achieves Z_A ≈ 0.245. Scouting BDT is 3-4× worse, expected due to limited reconstruction (no full tracking, coarser calo, UParT proxy for tau ID). Scouting ceiling estimated at Z_A ~ 0.15-0.18.
+
+- **Data leak identified**: `b_coi0_TauVsAll` and `tau_coi0_BvsAll` are defined as `-1.f` for background samples in `define_coi_matching()`. Excluded from BDT features.
+
+- **Skim safety**: identified race condition in auto-skim (no file locking). Added `fcntl.flock()` + atomic temp-file-then-rename to `ensure_slim()`. Added `SKIM = False` flag so scripts can skip auto-skimming entirely (use raw EOS + Define chains).
+
+- **Next steps**: add more features (AK8 H-taggers, subleading pTs, tau_OS, centrality), fix hyperparams (depth=4), k-fold CV, optuna tuning, per-channel BDTs
+
+### 2026-04-04
+
+- With the following cuts, **QCD multijet is reduced to exactly zero**:
+
+```yaml
+common:
+  min_jets: "nJets >= 2"
+  jet_pt: "ak4_pt0 > 20 && ak4_pt1 > 20"
+  b_coi0_score: "b_coi0_score > 0.8"
+  b_coi1_score: "b_coi1_score > 0.8"
+  dphi_bb_tautau: "dphi_bb_tautau > 1.5708"
+  dphi_MET_tau0: "dphi_MET_tau0 < 1.5708"
+  MT_tau0_MET: "MT_tau0_MET < 100"
+
+tauhtauh:
+  tau_coi0_score: "tau_coi0_score > 0.3"
+  tau_coi1_score: "tau_coi1_score > 0.3"
+  mbb_window: "mbb_coi > 70 && mbb_coi < 150"
+  mtautau_window: "mtautau_coi > 50 && mtautau_coi < 150"
+```
+
 ### 2026-04-01
 
 - Added cumulative S/√B plots (`cuml_sig/` directory, `ratio="cuml_significance"`)

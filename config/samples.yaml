@@ -9,13 +9,13 @@
 # dataset_tag:    null -> auto-select newest directory on disk
 # production_id:  null -> auto-select latest on disk
 #
-# All NanoAODv16Scouting24 production IDs are from 2026-03-22 (260322_*).
+# Production IDs: 260322_* (original Mar 22), 260328/260331/260401 (resubmissions)
 # These include UParT AK4 tagger branches (scoutUParT_*).
 # ============================================================================
 
 settings:
   base_dir: /eos/purdue/store/user/arghyara/production/Scouting/NanoAODv16Scouting24/mcscouting_2024
-  max_events: 100000
+  max_events: 999_999_999 # Triggered when MAX_EVENTS = None : effectively no limit
   xcache_prefix: "root://xcache.cms.rcac.purdue.edu/"
   dasgoclient: /cvmfs/cms.cern.ch/common/dasgoclient
   scouting_data_json: /home/das214/HHtobbtautau/Run3_nano_submission/datasets/Scouting_DATA.json
@@ -68,17 +68,17 @@ groups:
   #   Ref: https://twiki.cern.ch/twiki/bin/view/LHCPhysics/TtbarNNLO
   # --------------------------------------------------------------------------
   TT:
-    # TTto2L2Nu  → no 260322 directory on EOS yet (still in probe phase)
-    #   production_id: "260322_000648"
-    #   xsec_pb: 98.04
+    TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8:
+      production_id: "260328_050039"    # COMPLETED 1577 files (resubmitted)
+      xsec_pb: 98.04        # 923.6 * 0.3258^2
 
-    # TTto4Q  → no 260322 directory on EOS yet
-    #   production_id: "260322_000713"
-    #   xsec_pb: 419.7
+    TTto4Q_TuneCP5_13p6TeV_powheg-pythia8:
+      production_id: "260401_005901"    # COMPLETED 9075 files (resubmitted w/ ignoreLocality)
+      xsec_pb: 419.7        # 923.6 * 0.6741^2
 
     TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8:
       production_id: "260322_000729"    # COMPLETED 1246 files
-      xsec_pb: 405.7
+      xsec_pb: 405.7        # 923.6 * 2 * 0.3258 * 0.6741
 
   # --------------------------------------------------------------------------
   # QCD multijet (4-jet, HT-binned, LO madgraphMLM)
@@ -89,10 +89,9 @@ groups:
       production_id: "260322_000929"    # COMPLETED 226 files
       xsec_pb: 311300000.0
 
-    # QCD-4Jets HT-70to100   → no 260322 directory on EOS yet (probe idle)
-    # QCD-4Jets HT-400to600  → no 260322 directory on EOS yet (probe idle)
-    # QCD-4Jets HT-600to800  → no 260322 directory on EOS yet (probe running)
-    # QCD-4Jets HT-1200to1500 → no 260322 directory on EOS yet (probe running)
+    QCD-4Jets_Bin-HT-70to100_TuneCP5_13p6TeV_madgraphMLM-pythia8:
+      production_id: "260331_020649"    # COMPLETED 456 files (resubmitted w/ ignoreLocality)
+      xsec_pb: 25130000.0
 
     QCD-4Jets_Bin-HT-100to200_TuneCP5_13p6TeV_madgraphMLM-pythia8:
       production_id: "260322_000759"    # COMPLETED 254 files
@@ -102,12 +101,24 @@ groups:
       production_id: "260322_000859"    # 24/265 files, still running
       xsec_pb: 1975000.0
 
+    QCD-4Jets_Bin-HT-400to600_TuneCP5_13p6TeV_madgraphMLM-pythia8:
+      production_id: "260331_020732"    # COMPLETED 613 files (resubmitted w/ ignoreLocality)
+      xsec_pb: 114500.0
+
+    QCD-4Jets_Bin-HT-600to800_TuneCP5_13p6TeV_madgraphMLM-pythia8:
+      production_id: "260322_000944"    # 747/1722 files, still running
+      xsec_pb: 14520.0
+
     QCD-4Jets_Bin-HT-800to1000_TuneCP5_13p6TeV_madgraphMLM-pythia8:
       production_id: "260322_001014"    # COMPLETED 646 files
       xsec_pb: 3027.0
 
     QCD-4Jets_Bin-HT-1000to1200_TuneCP5_13p6TeV_madgraphMLM-pythia8:
       production_id: "260322_000745"    # 179/547 files, still running
+      xsec_pb: 895.1
+
+    QCD-4Jets_Bin-HT-1200to1500_TuneCP5_13p6TeV_madgraphMLM-pythia8:
+      production_id: "260401_005936"    # COMPLETED 1071 files (resubmitted w/ ignoreLocality)
       xsec_pb: 895.1
 
     QCD-4Jets_Bin-HT-1500to2000_TuneCP5_13p6TeV_madgraphMLM-pythia8:

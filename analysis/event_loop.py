@@ -198,6 +198,8 @@ def book_and_run(
     gen_hists_by_trig = materialize_gen_hists(gen_histo_book, sig_modes, lumi)
     mc_hists_excl_by_trig = {}
     for trig_name, histo_book in excl_histo_books.items():
+        if not histo_book:
+            continue
         n_groups = len(next(iter(histo_book.values())))
         mc_hists_excl_by_trig[trig_name] = materialize_hists(histo_book, n_groups, lumi)
 

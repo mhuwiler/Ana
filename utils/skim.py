@@ -15,6 +15,7 @@ Usage:
     # Auto-skim happens automatically in load_and_run() on first run.
 """
 
+import fcntl
 import json
 import os
 import re
@@ -316,26 +317,43 @@ def ensure_slim(mc, mc_files_map, expressions=None):
 
     os.makedirs(SLIM_DIR, exist_ok=True)
 
+    skimmed = []
     for name in samples_to_skim:
         n_files = n_files_map[name]
         slim = _slim_path(name, n_files)
-        df = mc[name]
-        # Get all columns (raw + derived), excluding non-serializable struct types
-        all_cols = []
-        for c in sorted(str(c) for c in df.GetColumnNames()):
-            try:
-                ct = df.GetColumnType(c)
-                # Skip struct/class types (GenHHResult, TLorentzVector, etc.)
-                if any(x in ct for x in ["Result", "Ana::", "TLorentz", "vector<", "RVec"]):
-                    continue
-                all_cols.append(c)
-            except Exception:
+        lock_path = slim + ".lock"
+
+        # Acquire exclusive lock — blocks if another process is skimming the same file
+        with open(lock_path, 'w') as lock_fd:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+
+            # Re-check: another process may have created it while we waited
+            if os.path.exists(slim):
+                print(f"  {name[:55]:55s} already created by another process, skipping")
+                skimmed.append(name)
                 continue
-        t0 = time.time()
-        df.Snapshot("Events", slim, all_cols)
-        sz = os.path.getsize(slim) / 1e6
-        print(f"  {name[:55]:55s} saved ({sz:.1f} MB, {time.time() - t0:.1f}s) [{n_files} files, {len(all_cols)} columns]")
-        _save_known_branches(name, n_files, all_cols)
+
+            df = mc[name]
+            # Get all columns (raw + derived), excluding non-serializable struct types
+            all_cols = []
+            for c in sorted(str(c) for c in df.GetColumnNames()):
+                try:
+                    ct = df.GetColumnType(c)
+                    # Skip struct/class types (GenHHResult, TLorentzVector, etc.)
+                    if any(x in ct for x in ["Result", "Ana::", "TLorentz", "vector<", "RVec"]):
+                        continue
+                    all_cols.append(c)
+                except Exception:
+                    continue
+            t0 = time.time()
+            # Write to temp file, then atomic rename to prevent partial reads
+            tmp = slim + ".tmp"
+            df.Snapshot("Events", tmp, all_cols)
+            os.rename(tmp, slim)
+            sz = os.path.getsize(slim) / 1e6
+            print(f"  {name[:55]:55s} saved ({sz:.1f} MB, {time.time() - t0:.1f}s) [{n_files} files, {len(all_cols)} columns]")
+            _save_known_branches(name, n_files, all_cols)
+            skimmed.append(name)
 
     total = sum(
         os.path.getsize(os.path.join(SLIM_DIR, f)) / 1e6
@@ -345,7 +363,7 @@ def ensure_slim(mc, mc_files_map, expressions=None):
     print(f"\n[auto-skim] Total disk: {total:.0f} MB in {SLIM_DIR}")
 
     # Reload from slim
-    for name in samples_to_skim:
+    for name in skimmed:
         n_files = n_files_map[name]
         mc[name] = _load_from_slim(name, n_files)
 

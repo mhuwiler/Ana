@@ -46,6 +46,7 @@ class AnalysisContext:
     max_data_files: int           # 0 = all data files
     max_events: object            # None = use default from samples.yaml
     cuts: object                  # None = use cuts.yaml, [] = no cuts, [...] = custom
+    skim: bool                    # True = auto-skim to slim files, False = always use raw EOS
     ana_dir: str                  # repo root directory
 
 
@@ -55,7 +56,8 @@ class AnalysisContext:
 
 def setup(script_file, samples, triggers=None, data=True,
           nthreads=4, nplot_workers=8, theme="light", overwrite=False,
-          max_mc_files=0, max_data_files=0, max_events=None, cuts=None):
+          max_mc_files=0, max_data_files=0, max_events=None, cuts=None,
+          skim=True):
     """One-line framework init. Returns AnalysisContext.
 
     Parameters
@@ -82,6 +84,9 @@ def setup(script_file, samples, triggers=None, data=True,
     cuts : list[str] or None
         C++ filter expressions applied to all samples. None = use cuts.yaml,
         empty list [] = no cuts.
+    skim : bool
+        If True (default), auto-skim to slim ROOT files for faster re-runs.
+        If False, always load from raw EOS and run Define chains (no disk writes).
     """
     init_logging()
     init_root(nthreads=nthreads)
@@ -153,6 +158,7 @@ def setup(script_file, samples, triggers=None, data=True,
         max_data_files=max_data_files,
         max_events=max_events,
         cuts=cuts,
+        skim=skim,
         ana_dir=ana_dir,
     )
 
@@ -212,7 +218,8 @@ def load_and_run(ctx, plot_vars, vars_2d=None, cm_2d=None):
     max_events = ctx.max_events if ctx.max_events is not None else MAX_EVENTS
     print(f"\nPreparing MC weights  MAX_EVENTS = {max_events}")
     mc, mc_files_map, dy_samples, tt_samples, sig_samples, qcd_samples = load_mc_samples(
-        group_files_by_sample, XSEC, max_events, args, rdf_exprs=rdf_exprs)
+        group_files_by_sample, XSEC, max_events, args, rdf_exprs=rdf_exprs,
+        skim=ctx.skim)
 
     # Load data
     data_df, lumi_precomputed = load_data(

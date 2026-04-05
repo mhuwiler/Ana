@@ -5,7 +5,8 @@ import yaml
 
 from utils.data import limit_files, load_scouting_data
 from utils.skim import load_slim_or_eos
-from analysis.definitions import define_gen_columns, define_kinematics, define_gen_matched_ak4, define_coi_matching, define_lepton_selection
+from analysis.definitions import (define_gen_columns, define_kinematics, define_gen_matched_ak4,
+                                  define_coi_matching, define_lepton_selection, define_qcd_rejection_vars)
 
 
 def _extract_named_cuts(section):
@@ -87,7 +88,8 @@ def resolve_cuts(cuts):
     return _extract_named_cuts(data.get("common")), "cuts.yaml [common]"
 
 
-def load_mc_samples(group_files_by_sample, xsec, max_events, args, rdf_exprs=None):
+def load_mc_samples(group_files_by_sample, xsec, max_events, args, rdf_exprs=None,
+                    skim=True):
     """Build weighted MC RDataFrames and define analysis columns.
 
     Parameters
@@ -160,21 +162,28 @@ def load_mc_samples(group_files_by_sample, xsec, max_events, args, rdf_exprs=Non
     qcd_samples = list(group_files_by_sample.get("QCD",    {}).keys())
 
     # Determine which samples loaded from slim (have derived columns)
-    from utils.skim import has_complete_slim_sample, ensure_slim, _slim_path
-    slim_samples = set()
-    needs_define = set()
-    for name in mc:
-        n_files = len(mc_files_map.get(name, []))
-        slim = _slim_path(name, n_files)
-        if os.path.exists(slim) and has_complete_slim_sample(slim):
-            slim_samples.add(name)
-        else:
-            needs_define.add(name)
+    if skim:
+        from utils.skim import has_complete_slim_sample, ensure_slim, _slim_path
+        slim_samples = set()
+        needs_define = set()
+        for name in mc:
+            n_files = len(mc_files_map.get(name, []))
+            slim = _slim_path(name, n_files)
+            if os.path.exists(slim) and has_complete_slim_sample(slim):
+                slim_samples.add(name)
+            else:
+                needs_define.add(name)
+    else:
+        # SKIM=False: skip slim detection, always run Define chains from raw EOS
+        slim_samples = set()
+        needs_define = set(mc.keys())
+        print(f"\n[skim=False] Skipping slim files, using raw EOS for all {len(needs_define)} sample(s)")
 
     if slim_samples:
         print(f"\n[slim] {len(slim_samples)} sample(s) loaded with pre-computed columns")
     if needs_define:
-        print(f"[slim] {len(needs_define)} sample(s) need Define chains")
+        if skim:
+            print(f"[slim] {len(needs_define)} sample(s) need Define chains")
 
     # Run Define chains only on samples that need them
     if needs_define:
@@ -189,17 +198,19 @@ def load_mc_samples(group_files_by_sample, xsec, max_events, args, rdf_exprs=Non
         define_coi_matching(mc_need, sig_need)
         for name in mc_need:
             mc_need[name] = define_lepton_selection(mc_need[name], obj_cfg)
+            mc_need[name] = define_qcd_rejection_vars(mc_need[name])
         mc.update(mc_need)
 
-        # Snapshot everything to slim
-        mc_to_skim = {n: mc[n] for n in needs_define}
-        ensure_slim(mc_to_skim, {n: mc_files_map[n] for n in needs_define})
+        if skim:
+            # Snapshot everything to slim
+            mc_to_skim = {n: mc[n] for n in needs_define}
+            ensure_slim(mc_to_skim, {n: mc_files_map[n] for n in needs_define})
 
-        # Re-define "w" on reloaded slim RDataFrames
-        for name in needs_define:
-            cols = set(str(c) for c in mc[name].GetColumnNames())
-            if "w" not in cols:
-                mc[name] = mc[name].Define("w", w_exprs[name])
+            # Re-define "w" on reloaded slim RDataFrames
+            for name in needs_define:
+                cols = set(str(c) for c in mc[name].GetColumnNames())
+                if "w" not in cols:
+                    mc[name] = mc[name].Define("w", w_exprs[name])
 
     return mc, mc_files_map, dy_samples, tt_samples, sig_samples, qcd_samples
 

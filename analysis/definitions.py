@@ -339,6 +339,132 @@ def define_lepton_selection(df, obj_cfg):
     return df
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  QCD rejection variables
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def define_qcd_rejection_vars(df):
+    """Additional variables for QCD multijet rejection.
+
+    Defines:
+      tau_coi0_charge, tau_coi1_charge — charge from UParT τ+/τ- probabilities
+      tau_OS                           — opposite-sign tau pair (bool)
+      score_product                    — b0 × b1 × τ0 × τ1 event-level discriminant
+      MET, MET_phi                     — scouting MET
+      MET_significance                 — MET / √HT
+      MT_tau0_MET                      — transverse mass of leading tau + MET
+      dphi_MET_tau0, dphi_MET_tau1     — Δφ(MET, tau COI)
+      dphi_bb_tautau                   — Δφ between bb and ττ systems
+      dR_bb_tautau                     — ΔR between bb and ττ system centroids
+      pt_tautau                        — pT of ττ system
+      D_zeta                           — pZeta - 0.85*pZeta_vis (ditau QCD killer)
+    """
+    # ── Tau charge from UParT (τ+ vs τ- probability) ──
+    df = (df
+        .Define("tau_coi0_charge",
+            "tau_coi0_pt > 0 ? (tau_coi0_taup > tau_coi0_taum ? 1 : -1) : 0")
+        .Define("tau_coi1_charge",
+            "tau_coi1_pt > 0 ? (tau_coi1_taup > tau_coi1_taum ? 1 : -1) : 0")
+        .Define("tau_OS",
+            "(bool)(tau_coi0_charge != 0 && tau_coi1_charge != 0 && "
+            "tau_coi0_charge != tau_coi1_charge)")
+    )
+
+    # ── Score product (poor man's likelihood ratio) ──
+    df = df.Define("score_product",
+        "(float)(b_coi0_score * b_coi1_score * tau_coi0_score * tau_coi1_score)")
+
+    # ── MET ──
+    df = (df
+        .Define("MET", "(float)ScoutingMET_pt")
+        .Define("MET_phi", "(float)ScoutingMET_phi")
+        .Define("MET_significance",
+            "(float)(HT > 0 ? ScoutingMET_pt / sqrt(HT) : 0.f)")
+    )
+
+    # ── Transverse mass: MT(tau0, MET) ──
+    df = df.Define("MT_tau0_MET",
+        "(float)(tau_coi0_pt > 0 ? sqrt(2 * tau_coi0_pt * ScoutingMET_pt * "
+        "(1 - cos(TVector2::Phi_mpi_pi(tau_coi0_phi - ScoutingMET_phi)))) : -1.f)")
+
+    # ── Δφ(MET, tau COIs) ──
+    df = (df
+        .Define("dphi_MET_tau0",
+            "(float)(tau_coi0_pt > 0 ? "
+            "abs(TVector2::Phi_mpi_pi(ScoutingMET_phi - tau_coi0_phi)) : -1.f)")
+        .Define("dphi_MET_tau1",
+            "(float)(tau_coi1_pt > 0 ? "
+            "abs(TVector2::Phi_mpi_pi(ScoutingMET_phi - tau_coi1_phi)) : -1.f)")
+    )
+
+    # ── ττ system kinematics ──
+    df = (df
+        .Define("pt_tautau",
+            "(float)(tau_coi0_pt > 0 && tau_coi1_pt > 0 ? "
+            "sqrt(pow(tau_coi0_pt*cos(tau_coi0_phi) + tau_coi1_pt*cos(tau_coi1_phi), 2) + "
+            "pow(tau_coi0_pt*sin(tau_coi0_phi) + tau_coi1_pt*sin(tau_coi1_phi), 2)) : -1.f)")
+        .Define("phi_tautau",
+            "(float)(tau_coi0_pt > 0 && tau_coi1_pt > 0 ? "
+            "atan2(tau_coi0_pt*sin(tau_coi0_phi) + tau_coi1_pt*sin(tau_coi1_phi), "
+            "tau_coi0_pt*cos(tau_coi0_phi) + tau_coi1_pt*cos(tau_coi1_phi)) : -99.f)")
+        .Define("eta_tautau",
+            "(float)(tau_coi0_pt > 0 && tau_coi1_pt > 0 ? "
+            "(tau_coi0_pt*tau_coi0_eta + tau_coi1_pt*tau_coi1_eta) / "
+            "(tau_coi0_pt + tau_coi1_pt) : -99.f)")
+    )
+
+    # ── bb system centroid ──
+    df = (df
+        .Define("phi_bb",
+            "(float)(b_coi0_pt > 0 && b_coi1_pt > 0 ? "
+            "atan2(b_coi0_pt*sin(b_coi0_phi) + b_coi1_pt*sin(b_coi1_phi), "
+            "b_coi0_pt*cos(b_coi0_phi) + b_coi1_pt*cos(b_coi1_phi)) : -99.f)")
+        .Define("eta_bb",
+            "(float)(b_coi0_pt > 0 && b_coi1_pt > 0 ? "
+            "(b_coi0_pt*b_coi0_eta + b_coi1_pt*b_coi1_eta) / "
+            "(b_coi0_pt + b_coi1_pt) : -99.f)")
+    )
+
+    # ── Δφ and ΔR between bb and ττ systems ──
+    df = (df
+        .Define("dphi_bb_tautau",
+            "(float)(phi_bb > -90 && phi_tautau > -90 ? "
+            "abs(TVector2::Phi_mpi_pi(phi_bb - phi_tautau)) : -1.f)")
+        .Define("dR_bb_tautau",
+            "(float)(eta_bb > -90 && eta_tautau > -90 ? "
+            "sqrt(pow(eta_bb - eta_tautau, 2) + "
+            "pow(TVector2::Phi_mpi_pi(phi_bb - phi_tautau), 2)) : -1.f)")
+    )
+
+    # ── D_zeta (pZeta - 0.85*pZeta_vis) — classic ditau QCD killer ──
+    # Bisector of tau1 and tau2 pT unit vectors
+    # pZeta_vis = projection of visible ditau pT along bisector
+    # pZeta = projection of (visible + MET) along bisector
+    df = (df
+        .Define("_zeta_ux",
+            "(float)(tau_coi0_pt > 0 && tau_coi1_pt > 0 ? "
+            "cos(tau_coi0_phi) + cos(tau_coi1_phi) : 0.f)")
+        .Define("_zeta_uy",
+            "(float)(tau_coi0_pt > 0 && tau_coi1_pt > 0 ? "
+            "sin(tau_coi0_phi) + sin(tau_coi1_phi) : 0.f)")
+        .Define("_zeta_norm",
+            "(float)sqrt(_zeta_ux*_zeta_ux + _zeta_uy*_zeta_uy)")
+        .Define("pZeta_vis",
+            "(float)(_zeta_norm > 0 ? "
+            "(tau_coi0_pt*cos(tau_coi0_phi) + tau_coi1_pt*cos(tau_coi1_phi)) * _zeta_ux / _zeta_norm + "
+            "(tau_coi0_pt*sin(tau_coi0_phi) + tau_coi1_pt*sin(tau_coi1_phi)) * _zeta_uy / _zeta_norm "
+            ": 0.f)")
+        .Define("pZeta",
+            "(float)(_zeta_norm > 0 ? "
+            "(tau_coi0_pt*cos(tau_coi0_phi) + tau_coi1_pt*cos(tau_coi1_phi) + ScoutingMET_pt*cos(ScoutingMET_phi)) * _zeta_ux / _zeta_norm + "
+            "(tau_coi0_pt*sin(tau_coi0_phi) + tau_coi1_pt*sin(tau_coi1_phi) + ScoutingMET_pt*sin(ScoutingMET_phi)) * _zeta_uy / _zeta_norm "
+            ": 0.f)")
+        .Define("D_zeta", "(float)(pZeta - 0.85f * pZeta_vis)")
+    )
+
+    return df
+
+
 _DATA_AK4 = "ScoutingPFJetRecluster"
 
 

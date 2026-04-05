@@ -9,16 +9,24 @@
 
 common:
   min_jets: "nJets >= 2"
-  b_coi0_score: "b_coi0_score > 0.6"
-  b_coi1_score: "b_coi1_score > 0.6"
+  jet_pt: "ak4_pt0 > 20 && ak4_pt1 > 20"
+  b_coi0_score: "b_coi0_score > 0.8"
+  b_coi1_score: "b_coi1_score > 0.8"
+  dphi_bb_tautau: "dphi_bb_tautau > 1.5"
+  dphi_MET_tau0: "dphi_MET_tau0 < 1.5"
+  MT_tau0_MET: "MT_tau0_MET < 100"
+  D_zeta: "D_zeta > -50"
 
 tauhtauh:
+  min_jets: "nJets >= 4"
+  lepton_veto: "!has_good_muon && !has_good_electron"
   tau_coi0_score: "tau_coi0_score > 0.3"
   tau_coi1_score: "tau_coi1_score > 0.3"
   mbb_window: "mbb_coi > 70 && mbb_coi < 150"
   mtautau_window: "mtautau_coi > 50 && mtautau_coi < 150"
 
 taumutauh:
+  min_jets: "nJets >= 3"
   has_muon: "has_good_muon"
   dR_mu_tau: "dR_mu_tau > 0.5"
   tau_coi0_score: "tau_coi0_score > 0.3"
@@ -26,6 +34,7 @@ taumutauh:
   mtautau_window: "mtautau_coi > 30 && mtautau_coi < 150"
 
 tauetauh:
+  min_jets: "nJets >= 3"
   has_electron: "has_good_electron"
   dR_el_tau: "dR_el_tau > 0.5"
   tau_coi0_score: "tau_coi0_score > 0.3"
