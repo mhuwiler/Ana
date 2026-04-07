@@ -7,22 +7,27 @@
 # Object-level lepton quality (pT, iso, dxy, dz) is in config/objects.yaml.
 # These define has_good_muon / has_good_electron via Ana::SelectMuon/Electron.
 
+# b_coi0_score                >       0.8815
+# b_coi1_score                >       0.6919
+# tau_coi0_score              >       0.9693
+# tau_coi1_score              >       0.9635
+
 common:
   min_jets: "nJets >= 2"
   jet_pt: "ak4_pt0 > 20 && ak4_pt1 > 20"
-  b_coi0_score: "b_coi0_score > 0.8"
-  b_coi1_score: "b_coi1_score > 0.8"
+  b_coi0_score: "b_coi0_score > 0.8815"
+  b_coi1_score: "b_coi1_score > 0.6919"
   dphi_bb_tautau: "dphi_bb_tautau > 1.5"
-  dphi_MET_tau0: "dphi_MET_tau0 < 1.5"
+  dphi_MET_tau0: "dphi_MET_tau0 < 1.4"
   MT_tau0_MET: "MT_tau0_MET < 100"
   D_zeta: "D_zeta > -50"
 
 tauhtauh:
   min_jets: "nJets >= 4"
-  lepton_veto: "!has_good_muon && !has_good_electron"
-  tau_coi0_score: "tau_coi0_score > 0.3"
-  tau_coi1_score: "tau_coi1_score > 0.3"
-  mbb_window: "mbb_coi > 70 && mbb_coi < 150"
+  # lepton_veto: "!has_good_muon && !has_good_electron"
+  tau_coi0_score: "tau_coi0_score > 0.9693"
+  tau_coi1_score: "tau_coi1_score > 0.9635"
+  mbb_window: "mbb_coi > 100 && mbb_coi < 150"
   mtautau_window: "mtautau_coi > 50 && mtautau_coi < 150"
 
 taumutauh:

@@ -24,17 +24,35 @@ MAX_MC_FILES = 22
 MAX_EVENTS   = 500000
 
 # Preselection: all cuts from cuts.yaml EXCEPT the tagger scores (which we optimize)
+# CUTS = [
+#     "nJets >= 4",
+#     "ak4_pt0 > 20 && ak4_pt1 > 20",
+#     "dphi_bb_tautau > 1.5708",
+#     "dphi_MET_tau0 < 1.5708",
+#     "MT_tau0_MET < 100",
+#     "D_zeta > -50",
+#     "!has_good_muon && !has_good_electron",   # lepton veto (tauhtauh)
+#     "mbb_coi > 70 && mbb_coi < 150",
+#     "mtautau_coi > 50 && mtautau_coi < 150",
+# ]
+
+
+# # Preselection (tauhtauh channel, minus tagger scores — BDT handles those)
 CUTS = [
     "nJets >= 4",
     "ak4_pt0 > 20 && ak4_pt1 > 20",
-    "dphi_bb_tautau > 1.5708",
-    "dphi_MET_tau0 < 1.5708",
-    "MT_tau0_MET < 100",
+    "dphi_bb_tautau > 1.5",
+    "dphi_MET_tau0 < 1.4",
+    # TODO: "dphi_MET_tau1 < 1.4", (form the second tau) (this can go for the leptonic tau)
+    "MT_tau0_MET < 100", # This also does not go fo rthe hadronic tau (check)
     "D_zeta > -50",
-    "!has_good_muon && !has_good_electron",   # lepton veto (tauhtauh)
+    # "!has_good_muon && !has_good_electron",
     "mbb_coi > 70 && mbb_coi < 150",
     "mtautau_coi > 50 && mtautau_coi < 150",
 ]
+
+
+
 
 # Tagger scores to optimize: (column_name, direction, (scan_lo, scan_hi))
 # All one-sided ">" cuts — RGS uses signal events as candidate thresholds

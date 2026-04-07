@@ -39,7 +39,7 @@ def book_cutflow_actions(trig_list, cuts_by_trig, mc, data_df,
 
         # Build cutflow steps: Trigger first, then each cut
         # Use expression as step name if no name provided
-        named_cuts = [(name or expr, expr) for name, expr in trig_cuts]
+        named_cuts = [(f"{name}: {expr}" if name else expr, expr) for name, expr in trig_cuts]
         cutflow_steps = [("Trigger", None)] + named_cuts
 
         # Start from pre-cut mc, apply trigger

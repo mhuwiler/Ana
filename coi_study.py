@@ -10,7 +10,7 @@ NTHREADS     = 32
 NPLOT_WORKERS = 32
 THEME        = "light"
 OVERWRITE    = True
-MAX_MC_FILES = 22
+MAX_MC_FILES = 3
 MAX_EVENTS   = None
 
 # Each entry: (trigger, [cut cards from cuts.yaml])

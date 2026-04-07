@@ -119,6 +119,43 @@ def train_test_split(sig, sig_w, bkg, bkg_w, test_fraction=0.5, seed=42):
             sig_test, sig_w_test, bkg_test, bkg_w_test)
 
 
+def train_test_split_multiclass(X, y, w, test_fraction=0.15, seed=42):
+    """Stratified train/test split preserving class proportions.
+
+    Parameters
+    ----------
+    X : array (n_events, n_features)
+    y : array (n_events,) — integer class labels
+    w : array (n_events,) — physics weights
+    test_fraction : float
+    seed : int
+
+    Returns
+    -------
+    (X_train, y_train, w_train, X_test, y_test, w_test)
+    """
+    rng = np.random.RandomState(seed)
+    train_idx, test_idx = [], []
+
+    for c in np.unique(y):
+        c_idx = np.where(y == c)[0]
+        perm = rng.permutation(len(c_idx))
+        n_test = max(1, int(len(c_idx) * test_fraction))
+        test_idx.append(c_idx[perm[:n_test]])
+        train_idx.append(c_idx[perm[n_test:]])
+
+    train_idx = np.concatenate(train_idx)
+    test_idx = np.concatenate(test_idx)
+
+    # Shuffle within train/test
+    train_idx = rng.permutation(train_idx)
+    test_idx = rng.permutation(test_idx)
+
+    print(f"  Train: {len(train_idx)}, Test: {len(test_idx)}")
+    return (X[train_idx], y[train_idx], w[train_idx],
+            X[test_idx], y[test_idx], w[test_idx])
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Backend: numpy (fallback)
 # ═══════════════════════════════════════════════════════════════════════════════
