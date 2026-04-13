@@ -4,6 +4,32 @@
 
 ## Activity Log
 
+### 2026-04-09
+
+- **Trigger efficiency study** (`trig_eff.py`): CMS-style trigger efficiency vs gen_mHH plot
+  - Filled cyan histogram: signal mHH distribution before trigger
+  - Efficiency curves with Clopper-Pearson errors for DST_JetHT and PARKING_HH
+  - DST_JetHT: ~45% at mHH=300 GeV, rising to ~100% above 700 GeV
+  - PARKING_HH: ~15% at mHH=300 GeV, rising to ~75% at 1000 GeV
+  - New function `plot_trigger_efficiency_overlay()` in `utils/plotting.py`
+- **Documentation audit and update**: all docs synced with current codebase state
+- **Gitignore cleanup**: added `.claude/`, `.vscode/`, `docs/`, `*.root`, `*.npz`, editor/OS files
+- Removed Claude co-author tags from all 4 past commits via `git filter-branch`
+
+### 2026-04-07
+
+- **Multi-class BDT** (`classify.py` with `MULTICLASS = True`):
+  - 12 decay modes as separate classes (5 DY + 3 TT + 1 QCD + 3 signal)
+  - XGBoost `multi:softprob`, per-class weight normalization
+  - Stratified train/val/test split preserving class proportions
+  - Confusion matrix, per-class ROC (12 one-vs-rest curves), signal score distribution
+  - Significance scan on signal score = sum of signal class probabilities
+  - Z_A = 0.070 ± 0.014 (with stat uncertainties on S, B, Z_A)
+  - QCD class dropped automatically (0 events after preselection)
+- **Removed 3 preselection cuts** per advisor: `dphi_MET_tau0 < 1.4`, `MT_tau0_MET < 100`, `D_zeta > -50`; kept as BDT features to check importance
+- **Trigger study script** (`trigger_study.py`): per-trigger cutflow + inclusive/exclusive trigger overlays
+- **Cutflow name fix**: shows `name: expr` instead of just `name` (e.g. `min_jets: nJets >= 4`)
+
 ### 2026-04-05
 
 - **BDT classifier runs** (XGBoost, GPU on A100):

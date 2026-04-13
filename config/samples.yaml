@@ -15,7 +15,7 @@
 
 settings:
   base_dir: /eos/purdue/store/user/arghyara/production/Scouting/NanoAODv16Scouting24/mcscouting_2024
-  max_events: 999_999_999 # Triggered when MAX_EVENTS = None : effectively no limit
+  max_events: 999_999_999 # HARD CONSTRAINT: Triggered only when MAX_EVENTS = None : effectively no limit
   xcache_prefix: "root://xcache.cms.rcac.purdue.edu/"
   dasgoclient: /cvmfs/cms.cern.ch/common/dasgoclient
   scouting_data_json: /home/das214/HHtobbtautau/Run3_nano_submission/datasets/Scouting_DATA.json

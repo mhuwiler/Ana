@@ -560,11 +560,11 @@ TRIGGER_STYLES = {
     "DST_Muon":          {"color": "tab:green",  "linestyle": "-.", "linewidth": 2.5},
     "DST_Electron":      {"color": "tab:red",    "linestyle": "--", "linewidth": 2.5},
     "PARKING_HH":        {"color": "tab:orange", "linestyle": ":",  "linewidth": 3.0},
-    # Exclusive variants (same hue, thinner line)
-    "DST_JetHT_excl":    {"color": "tab:blue",   "linestyle": "--", "linewidth": 1.5},
-    "DST_Muon_excl":     {"color": "tab:green",  "linestyle": "-.", "linewidth": 1.5},
-    "DST_Electron_excl": {"color": "tab:red",    "linestyle": "--", "linewidth": 1.5},
-    "PARKING_HH_excl":   {"color": "tab:orange", "linestyle": ":",  "linewidth": 2.0},
+    # Exclusive variants (distinct colors)
+    "DST_JetHT_excl":    {"color": "tab:purple",  "linestyle": "--", "linewidth": 2.0},
+    "DST_Muon_excl":     {"color": "tab:olive",   "linestyle": "-.", "linewidth": 2.0},
+    "DST_Electron_excl": {"color": "tab:brown",   "linestyle": "--", "linewidth": 2.0},
+    "PARKING_HH_excl":   {"color": "tab:pink",    "linestyle": ":",  "linewidth": 2.5},
 }
 
 
@@ -594,6 +594,144 @@ def plot_trigger_shape_overlay(h_total_by_trig, *, logy=False, title=None):
     ax.legend()
     if logy:
         ax.set_yscale("log")
+
+    return fig, ax
+
+
+def plot_trigger_efficiency_overlay(h_denom, h_num_by_trig, *, xlabel="",
+                                    lumi=None, title=None):
+    """CMS-style trigger efficiency overlay with signal distribution background.
+
+    Parameters
+    ----------
+    h_denom : TH1
+        Signal histogram BEFORE any trigger (denominator). Shown as filled shape.
+    h_num_by_trig : dict {trig_name: TH1}
+        Signal histogram WITH trigger applied (numerator), one per trigger.
+    """
+    import ROOT as _ROOT
+
+    edges, denom_vals, _ = th1_to_np(h_denom)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    widths = np.diff(edges)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Left y-axis: trigger efficiency (0 to 1.2)
+    ax.set_ylabel("Trigger efficiency")
+    ax.set_ylim(0, 1.2)
+    ax.axhline(1.0, color="gray", linestyle="--", linewidth=0.8, alpha=0.5)
+
+    for trig_name, h_num in h_num_by_trig.items():
+        teff = _ROOT.TEfficiency(h_num, h_denom)
+        teff.SetUseWeightedEvents(True)
+        x, y, xerr, ylo, yhi = teff_to_np(teff)
+        if len(x) == 0:
+            continue
+        style = TRIGGER_STYLES.get(trig_name, {"color": "black", "linestyle": "-", "linewidth": 2})
+        ax.errorbar(x, y, xerr=xerr, yerr=np.vstack([ylo, yhi]),
+                    fmt="o", ms=4, capsize=2, linewidth=1.5,
+                    color=style["color"], label=trig_name)
+
+    # Right y-axis: filled signal distribution (normalized, no label)
+    ax2 = ax.twinx()
+    area = float(np.sum(denom_vals * widths))
+    norm_vals = denom_vals / area if area > 0 else denom_vals
+    ax2.bar(centers, norm_vals, width=widths, alpha=0.25, color="tab:cyan",
+            edgecolor="tab:cyan", linewidth=0.5,
+            label="Distribution before\ntrigger requirements")
+    ax2.set_yticks([])  # hide right y-axis ticks
+    ax2.set_ylim(0, float(np.max(norm_vals)) * 2.0 if np.any(norm_vals > 0) else 1)
+
+    ax.set_xlabel(xlabel)
+    ax.set_xlim(250, 1200)
+    ax.set_xticks(range(300, 1201, 100))
+    if title is not None:
+        ax.set_title(title)
+    ax.grid(True, axis="both", alpha=0.25)
+
+    # Combine legends from both axes
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, loc="center right", fontsize=9)
+
+    if lumi is not None:
+        cms_label(ax, lumi=lumi)
+
+    return fig, ax
+
+
+def plot_per_bin_significance(h_sig, h_bkg, *, xlabel="", lumi=None, title=None):
+    """CMS-style per-bin Z_A plot with signal distribution background.
+
+    Parameters
+    ----------
+    h_sig : TH1
+        Signal histogram (lumi-scaled yields per bin).
+    h_bkg : TH1
+        Background histogram (lumi-scaled yields per bin).
+    """
+    from analysis.cutflow import asimov_significance
+    import math
+
+    edges_s, sig_vals, _ = th1_to_np(h_sig)
+    edges_b, bkg_vals, _ = th1_to_np(h_bkg)
+    centers = 0.5 * (edges_s[:-1] + edges_s[1:])
+    widths = np.diff(edges_s)
+    nbins = len(centers)
+
+    # Compute per-bin Z_A with error propagation
+    z_vals = np.zeros(nbins)
+    z_errs = np.zeros(nbins)
+    for i in range(nbins):
+        S = float(sig_vals[i])
+        B = float(bkg_vals[i])
+        Z = asimov_significance(S, B)
+        z_vals[i] = Z if not math.isnan(Z) else 0.0
+        # Stat uncertainty: dS = sqrt(S/lumi) * lumi = sqrt(S*lumi) ... but for weighted:
+        # Use Poisson approx: dS ~ sqrt(S), dB ~ sqrt(B) (already lumi-scaled)
+        if S > 0 and B > 0 and z_vals[i] > 0:
+            dZdS = math.log(1 + S / B) / z_vals[i]
+            dZdB = (math.log(1 + S / B) - S / B) / z_vals[i]
+            dS = math.sqrt(abs(S))
+            dB = math.sqrt(abs(B))
+            z_errs[i] = math.sqrt((dZdS * dS)**2 + (dZdB * dB)**2)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Left y-axis: Z_A per bin
+    ax.set_ylabel(r"$Z_A$ (Asimov significance)")
+    mask = z_vals > 0
+    if np.any(mask):
+        ax.errorbar(centers[mask], z_vals[mask], xerr=widths[mask]/2,
+                    yerr=z_errs[mask], fmt="o", ms=5, capsize=2,
+                    linewidth=1.5, color="tab:red", label=r"Per-bin $Z_A$")
+        ax.set_ylim(0, float(np.max(z_vals[mask] + z_errs[mask])) * 1.5)
+
+    # Right y-axis: filled signal distribution (normalized)
+    ax2 = ax.twinx()
+    area = float(np.sum(sig_vals * widths))
+    norm_vals = sig_vals / area if area > 0 else sig_vals
+    ax2.bar(centers, norm_vals, width=widths, alpha=0.25, color="tab:cyan",
+            edgecolor="tab:cyan", linewidth=0.5,
+            label="Signal distribution")
+    ax2.set_yticks([])
+    ax2.set_ylim(0, float(np.max(norm_vals)) * 2.0 if np.any(norm_vals > 0) else 1)
+
+    ax.set_xlabel(xlabel)
+    ax.set_xlim(250, 1200)
+    ax.set_xticks(range(300, 1201, 100))
+    if title is not None:
+        ax.set_title(title)
+    ax.grid(True, axis="both", alpha=0.25)
+
+    # Combined legend
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, loc="upper right", fontsize=9)
+
+    if lumi is not None:
+        cms_label(ax, lumi=lumi)
 
     return fig, ax
 

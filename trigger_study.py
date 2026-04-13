@@ -65,3 +65,44 @@ if __name__ == '__main__':
     result = load_and_run(ctx, PLOT_VARS)
     result.plot.stacked(ratio="significance")
     result.plot.trigger_overlays()
+
+    # ── CMS-style trigger efficiency vs gen_mHH ──────────────────────────
+    import os
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from utils.plotting import plot_trigger_efficiency_overlay
+
+    trig_sel = result.trig_selections
+
+    # Denominator: NoTrigger signal mHH (sum all signal samples)
+    h_denom_ptrs = trig_sel["NoTrigger"]["sig_mHH_ptrs"]
+    if h_denom_ptrs:
+        h_denom = h_denom_ptrs[0].GetPtr().Clone("h_mHH_denom")
+        for p in h_denom_ptrs[1:]:
+            h_denom.Add(p.GetPtr())
+
+        # Numerator: per trigger
+        h_num_by_trig = {}
+        for trig_name in ["DST_JetHT", "PARKING_HH"]:
+            if trig_name not in trig_sel:
+                continue
+            ptrs = trig_sel[trig_name]["sig_mHH_ptrs"]
+            if not ptrs:
+                continue
+            h_num = ptrs[0].GetPtr().Clone(f"h_mHH_{trig_name}")
+            for p in ptrs[1:]:
+                h_num.Add(p.GetPtr())
+            h_num_by_trig[trig_name] = h_num
+
+        if h_num_by_trig:
+            fig, ax = plot_trigger_efficiency_overlay(
+                h_denom, h_num_by_trig,
+                xlabel=r"Generator-level $m_{HH}$ [GeV]",
+                lumi=result.lumi,
+                title=r"$HH \to bb\tau\tau$")
+            outpath = os.path.join(ctx.plot_dir, "trigger_efficiency_mHH.png")
+            os.makedirs(os.path.dirname(outpath), exist_ok=True)
+            fig.savefig(outpath, dpi=150, bbox_inches="tight")
+            plt.close(fig)
+            print(f"  Saved: {outpath}")

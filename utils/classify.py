@@ -750,7 +750,7 @@ def save_model(model, feature_names, scan, auc_val, outdir):
     summary_path = os.path.join(outdir, "summary.txt")
     with open(summary_path, "w") as f:
         f.write("BDT Classifier Summary\n" + "=" * 50 + "\n\n")
-        f.write(f"AUC: {auc_val:.4f}\n")
+        f.write(f"AUC: {auc_val:.4f}\n" if auc_val is not None else "AUC: N/A (multi-class)\n")
         f.write(f"Best BDT score threshold: {scan['best_threshold']:.4f}\n")
         f.write(f"S = {scan['best_S']:.4g}\n")
         f.write(f"B = {scan['best_B']:.4g}\n")

@@ -1,13 +1,14 @@
 # HH→bbττ Scouting Analysis — Current Status
 
-*Last updated: 2026-03-20*
+*Last updated: 2026-04-09*
 
 ## Overview
 
 Search for non-resonant Higgs pair production in the bbττ final state using
-CMS Run 3 (2024) scouting data at √s = 13.6 TeV. The analysis uses
-ScoutingPFJetRecluster jets with ParticleNet b-tagging in a fully hadronic
-selection (≥4 jets, dijet mass windows for H→bb and H→ττ candidates).
+CMS Run 3 (2024) scouting data at √s = 13.6 TeV. Three decay channels:
+τhτh (fully hadronic), τμτh, and τeτh. Uses UParT AK4 tagger for b/tau
+identification and COI (Candidate-of-Interest) matching for Higgs candidate
+reconstruction.
 
 **Luminosity**: 103.965 fb⁻¹ (from brilcalc, Run2024 golden JSON)
 
@@ -54,15 +55,25 @@ All MC events get a single `decayMode` integer from `Ana::GlobalDecayMode()`:
 
 ## Selection (Cutflow)
 
-```
-Trigger → ≥4 jets → 4 jets pT > 20 → 2 b-tags (BvsAll > 0.1)
-→ H→bb mass [100,150] GeV → H→ττ mass [40,150] GeV
-```
+Per-channel cuts defined in `config/cuts.yaml` with named cards:
 
-Three trigger paths analyzed in parallel:
-- **NoTrigger** — preselection only (no trigger requirement)
-- **DST_JetHT** — `DST_PFScouting_JetHT` (scouting hadronic)
-- **PARKING_HH** — OR of 11 HLT quad-jet/b-tag paths (parking)
+**Common**: nJets ≥ 2, jet pT > 20, b-tag scores > 0.8, dphi(bb,ττ) > 1.5, dphi(MET,τ₀) < 1.4, MT(τ₀,MET) < 100, D_ζ > -50
+
+**τhτh**: nJets ≥ 4, lepton veto, tau scores > 0.3, mbb ∈ [70,150], mττ ∈ [50,150]
+
+**τμτh**: nJets ≥ 3, require good muon, ΔR(μ,τ) > 0.5, tau score > 0.3, mass windows
+
+**τeτh**: nJets ≥ 3, require good electron, ΔR(e,τ) > 0.5, tau score > 0.3, mass windows
+
+**QCD rejection variables**: D_ζ, MT(τ₀,MET), dphi(MET,τ₀), score_product, tau_OS, MET_significance
+
+**Lepton selection**: `Ana::SelectMuon()` / `Ana::SelectElectron()` in C++, cuts from `config/objects.yaml`
+
+Four trigger paths:
+- **NoTrigger** — preselection only
+- **DST_JetHT** — scouting hadronic
+- **DST_Muon** / **DST_Electron** — scouting leptonic
+- **PARKING_HH** — parking HH (11 HLT paths)
 
 
 ## Plot Types
@@ -71,52 +82,81 @@ Three trigger paths analyzed in parallel:
 |------|-------------|--------|
 | Stacked | MC stacked histogram (12 groups) | `stacked/{trig}_{var}.png` |
 | Shape | Normalized MC overlay | `shape/{trig}_{var}.png` |
-| Trigger overlay | All-MC summed, 3 triggers overlaid | `overlay/{var}.png` |
+| Trigger overlay | All-MC summed, triggers overlaid | `overlay/{var}.png` |
+| Exclusive overlay | Events firing ONLY one trigger | `overlay_exclusive/{var}.png` |
 | Per-channel overlay | Signal-only per decay channel | `overlay/{ch}_{var}.png` |
 | Eff stacked | Stacked + trigger efficiency panel | `eff/{trig}/{var}.png` |
 | Sig stacked | Stacked + bin-by-bin S/√B panel | `sig/{trig}/{var}.png` |
 | Cum sig | Stacked + cumulative S/√B (right-to-left) | `cuml_sig/{trig}/{var}.png` |
+| Trig efficiency | CMS-style efficiency vs gen_mHH | `trigger_efficiency_mHH.png` |
+
+## BDT Classification
+
+| Mode | Description | Objective |
+|------|-------------|-----------|
+| Binary | Signal vs background | `binary:logistic` |
+| Multi-class | 12 decay modes as separate classes | `multi:softprob` |
+
+**BDT plots**: confusion matrix, per-class ROC, feature importance, score distribution, significance scan (with stat uncertainties), overtraining check, loss curves.
+
+**Best results** (binary, tauhtauh preselection): AUC = 0.93, Z_A = 0.087. Nominal analysis achieves Z_A ≈ 0.245 — gap is inherent to scouting reconstruction.
+
+## Cut Optimization
+
+RGS (Random Grid Search) + Grid Search with GPU/JIT/numpy backends. Signal events as candidate thresholds, Asimov significance as figure of merit.
 
 
 ## Code Architecture
 
+14 user scripts, 11 analysis modules, 8 utility modules:
+
 ```
-Ana/
-├── cutflow_TrigEff.py      Orchestrator (~590 LOC): CLI, phase sequencing
-├── make_pdf.py             PDF comparison tool (side-by-side triggers)
-├── genAna.py               Gen-level analysis (signal MC only)
-├── analysis/               Core analysis modules (extracted from cutflow_TrigEff.py)
-│   ├── config.py           YAML config loaders (variables, triggers, decay modes)
-│   ├── definitions.py      RDataFrame .Define() chains (kinematics, gen matching)
-│   ├── histograms.py       Histogram booking & materialisation
-│   ├── cutflow.py          Cutflow booking, extraction, markdown formatting
-│   ├── cache.py            Histogram cache save/load/invalidation
-│   └── plots.py            Plot orchestration (Phase 3, 3.5, 5)
-├── elements/               C++ engine (compiled via ACLiC)
-│   ├── common.h            Shared types, PDG constants, utilities
-│   ├── GenMatching.C       Gen-level matching (DY, TT, Signal, GlobalDecayMode)
-│   └── RecoObjects.C       Reco selection (leptons, b-jets, dijet pairing)
-├── config/                 YAML configuration (no magic numbers in C++)
-│   ├── samples.yaml        MC samples, file paths, cross sections
-│   ├── objects.yaml        Object quality cuts (muon, electron, btag)
-│   ├── acceptance.yaml     Fiducial/preselection cuts
-│   ├── regions.yaml        Signal region mass windows
-│   ├── cuts.yaml           User-defined selection cuts
-│   ├── variables.yaml      Plot variable definitions (bins, ranges, labels)
-│   └── triggers.yaml       Trigger definitions + brilcalc paths
-├── utils/                  Python utilities
-│   ├── data.py             Sample loading, XCache, file discovery
-│   ├── plotting.py         Matplotlib/mplhep low-level plot functions
-│   ├── triggers.py         Trigger bit definitions (DST, Parking)
-│   └── skim.py             Slim ROOT file writer (branch auto-detection)
-├── scripts/                Shell scripts
-│   ├── run_xsec.sh         GenXSecAnalyzer wrapper
-│   ├── run_brilcalc.sh     Luminosity calculation
-│   └── check_prescale.sh   Trigger prescale checks
-├── legacy/                 Old code (kept for reference, not used)
-├── des/                    Design docs (separate git repo)
-├── notes.md                Working notes + activity log
-└── status.md               This file
+scouting_HHbbtautau/
+├── User scripts (analysis)
+│   ├── classify.py             BDT classifier (binary + multi-class)
+│   ├── optimize.py             Cut optimization (RGS + Grid Search)
+│   ├── trigger_study.py        Trigger overlays + cutflow per trigger
+│   ├── trig_eff.py             Trigger efficiency vs gen_mHH
+│   ├── coi_study.py            COI tagging study (with cuts)
+│   ├── HHbbtt.py               Gen-matched analysis
+│   ├── kinematics.py           AK4 jet kinematics
+│   ├── ak8.py                  AK8 fat-jet studies
+│   └── ...                     (+ 6 more: allMC_wocuts, coi_study_wocuts, etc.)
+├── analysis/                   Framework core (11 modules)
+│   ├── runner.py               setup(), load_and_run(), PlotResult, Plotter
+│   ├── event_loop.py           book_and_run(), RunGraphs, EventLoopResult
+│   ├── data_loading.py         MC/data loading, SKIM flag, auto-skim
+│   ├── definitions.py          RDataFrame .Define() chains (~42 KB)
+│   ├── cutflow.py              Per-trigger cutflow with per-channel S/√B
+│   ├── histograms.py           Histogram booking (inclusive + exclusive triggers)
+│   ├── plots.py                Plot orchestration + parallel rendering
+│   ├── config.py               YAML config loaders
+│   ├── constants.py            Branch names, physics constants
+│   ├── variables.py            PlotVar dataclass
+│   └── setup.py                ROOT init, macro loading
+├── utils/                      Library modules (8 modules)
+│   ├── classify.py             BDT: train, evaluate, significance scan, plots
+│   ├── optimize.py             Cut optimizer: RGS, Grid, GPU/JIT/numpy
+│   ├── plotting.py             Stacked/shape/overlay/efficiency plots, CMS style
+│   ├── skim.py                 Slim files with file locking + atomic writes
+│   ├── data.py                 Sample loading, brilcalc, file discovery
+│   ├── triggers.py             Trigger bit definitions
+│   ├── logging.py              Timestamped run logging
+│   └── pdf.py                  PDF generation
+├── elements/                   C++ engine
+│   ├── common.h                Shared types, PDG constants
+│   ├── GenMatching.C           Gen matching, GlobalDecayMode()
+│   └── RecoObjects.C           SelectMuon(), SelectElectron(), dijet pairing
+├── config/                     YAML configuration
+│   ├── samples.yaml            MC samples, cross sections, file paths
+│   ├── analysis.yaml           Decay modes, sig/bkg mode lists
+│   ├── cuts.yaml               Named cut cards (common, tauhtauh, taumutauh, tauetauh)
+│   ├── objects.yaml            Lepton quality cuts (pT, η, iso, dxy, dz)
+│   └── triggers.yaml           Trigger definitions + brilcalc paths
+├── legacy/                     Old code (kept for reference)
+├── docs/                       Wiki + design docs
+├── notes.md                    Working notes + activity log
+└── status.md                   This file
 ```
 
 
@@ -130,12 +170,23 @@ Ana/
 
 ## What's Next
 
-- [ ] Run with data overlay (drop `--no-data`)
-- [ ] Generate all plots for all variables (drop `--plot-vars`)
-- [ ] Investigate missing QCD HT bins (400-600, 600-800) — request production?
-- [ ] Add leptonic triggers (DST_Muon, DST_Electron, PARKING_Muon, PARKING_EG)
-- [ ] Enable BSM signal benchmarks (9 coupling points in config, commented out)
-- [x] Performance optimization: merge 7 RunGraphs into 1 (done)
-- [x] Generalize `_build_groups()` to be fully config-driven (done — analysis/histograms.py)
-- [x] Organize plots into subfolders (stacked/, shape/, overlay/) (done)
-- [x] Modularise cutflow_TrigEff.py into analysis/ package (done — 2,280→590 LOC)
+- [ ] N-1 plots (show each cut's impact individually)
+- [ ] Stat uncertainties in cutflow table (√Σw²)
+- [ ] Per-channel BDTs (separate for τhτh, τμτh, τeτh)
+- [ ] mHH reconstruction (4-body invariant mass from COI candidates)
+- [ ] DNN classifier (PyTorch, compare with BDT)
+- [ ] Bayesian hyperparameter optimization (Optuna)
+- [ ] k-fold cross-validation for more reliable Z_A
+- [ ] Enable BSM signal benchmarks (9 coupling points in config)
+- [x] Multi-class BDT (12 decay modes, XGBoost multi:softprob)
+- [x] Binary BDT classifier (XGBoost GPU, Z_A = 0.087)
+- [x] Cut optimizer (RGS + Grid Search, GPU/JIT/numpy)
+- [x] Trigger efficiency study (CMS-style mHH plot)
+- [x] Trigger overlays (inclusive + exclusive)
+- [x] Lepton selection (C++ SelectMuon/SelectElectron)
+- [x] QCD rejection (D_ζ, MT, dphi, score_product → QCD = 0)
+- [x] Skim safety (file locking, SKIM=False flag)
+- [x] Per-trigger cuts with per-channel cutflow
+- [x] Cumulative S/√B plots
+- [x] Modularise into analysis/ package
+- [x] Merge RunGraphs into single event loop

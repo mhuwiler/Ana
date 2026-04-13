@@ -30,3 +30,34 @@ build/
 logs*/
 output/
 wiki/
+
+# Claude Code
+.claude/
+
+# VSCode
+.vscode/
+
+# Docs (Foam wiki, notes — not analysis code)
+docs/
+
+# Standalone examples / scratch
+# example_standalone.py
+
+# ROOT files (data is on EOS, not in repo)
+*.root
+
+# Numpy archives
+*.npz
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~

@@ -493,6 +493,7 @@ class PlotResult:
         self.sig_indices = event_result.sig_indices
         self.bkg_indices = event_result.bkg_indices
         self.h2d_book = event_result.h2d_book
+        self.excl_sig_mHH_ptrs = event_result.excl_sig_mHH_ptrs
 
         # Data histograms (None if --no-data)
         self.data_hists_by_trig = data_hists_by_trig

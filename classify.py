@@ -20,7 +20,7 @@ MAX_EVENTS   = None
 CUTS = [
     "nJets >= 4",
     "ak4_pt0 > 20 && ak4_pt1 > 20",
-    "dphi_bb_tautau > 1.5",
+    "dphi_bb_tautau > 1.5", # Delta R maybe?
     "mbb_coi > 70 && mbb_coi < 150",
     "mtautau_coi > 50 && mtautau_coi < 150",
 ]
@@ -28,12 +28,13 @@ CUTS = [
 # Features for BDT (20 variables)
 FEATURES = [
     "b_coi0_score", "b_coi1_score", "tau_coi0_score", "tau_coi1_score",
-    "mbb_coi", "mtautau_coi",
+    "mbb_coi", # This shoudl be removed (sculpting)
+    "mtautau_coi",
     "dR_bb_coi", "dR_tautau_coi", "dR_bb_tautau", "dphi_bb_tautau",
     "HT", "MET", "MET_significance", "nJets",
     "score_product",
     "D_zeta", "MT_tau0_MET", "dphi_MET_tau0",
-    "b_coi0_pt", "tau_coi0_pt",
+    "b_coi0_pt", "tau_coi0_pt", # This could be removed
 ]
 
 LUMI     = 103.965
@@ -42,6 +43,7 @@ USE_GPU  = True
 
 # Multi-class classification: all 12 decay modes as separate classes
 MULTICLASS = False
+# MULTICLASS = True
 
 CLASS_MAP = {
     1: 0, 2: 1, 3: 2, 4: 3, 5: 4,       # DY (5 classes)

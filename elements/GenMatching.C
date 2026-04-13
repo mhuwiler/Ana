@@ -50,7 +50,7 @@ double deltaR_(double eta1, double phi1, double eta2, double phi2) {
     double dphi = deltaPhi_(phi1, phi2);
     return std::sqrt(deta * deta + dphi * dphi);
 }
-bool isLastCopy_(int flags)      { return (flags >> 13) & 1; }
+bool isLastCopy_(int flags)      { return (flags >> 13) & 1; } // Check from the NanoAOD version
 bool isHardProcess_(int flags)   { return (flags >>  7) & 1; }
 bool fromHardProcess_(int flags) { return (flags >>  8) & 1; }
 

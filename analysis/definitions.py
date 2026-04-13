@@ -22,6 +22,9 @@ def _vs_all_at(idx_var, prob_name):
 #  AK4 jet basics
 # ═══════════════════════════════════════════════════════════════════════════════
 
+    df = (df
+        .Define("ak4_pt0",  f"ScoutingFPJetReCluster2_pt[0]")
+
 def define_ak4_jets(df):
     """AK4 jet pT/eta/mass, nJets, HT, MHT, nLeptons, nMuons, nElectrons, centrality."""
     df = (df
@@ -130,6 +133,9 @@ def define_b_candidates(df):
         .Define("ak4_TauVsAll",  f"({_U}_probtaup + {_U}_probtaum) / ({_denom})")
         .Define("bsort_idx",
                 "ROOT::VecOps::Reverse(ROOT::VecOps::Argsort(ak4_BvsAll))")
+        # ak4_BvsAll = [4, 5, 2, 3,  6, 7]  # indices of ak4_BvsAll in the RDataFrame (for convenience in string formatting below)
+        # bsort_idx = [2, 3, ..]
+        
         # B COI: jets with highest/2nd-highest BvsAll score
         .Define("b_coi0_idx", "nJets >= 1 ? (int)bsort_idx[0] : -1")
         .Define("b_coi1_idx", "nJets >= 2 ? (int)bsort_idx[1] : -1")
@@ -157,14 +163,14 @@ def define_b_candidates(df):
                 "(float)(ROOT::Math::PtEtaPhiMVector(b_coi0_pt,b_coi0_eta,b_coi0_phi,b_coi0_mass)"
                 " + ROOT::Math::PtEtaPhiMVector(b_coi1_pt,b_coi1_eta,b_coi1_phi,b_coi1_mass)).Pt() : -1.f")
         # Backwards-compat aliases
-        .Define("b0_idx", "b_coi0_idx").Define("b1_idx", "b_coi1_idx")
-        .Define("b0_pt", "b_coi0_pt").Define("b0_eta", "b_coi0_eta")
-        .Define("b0_phi", "b_coi0_phi").Define("b0_mass", "b_coi0_mass")
-        .Define("b0_score", "b_coi0_score").Define("b0_raw", "b_coi0_raw")
-        .Define("b1_pt", "b_coi1_pt").Define("b1_eta", "b_coi1_eta")
-        .Define("b1_phi", "b_coi1_phi").Define("b1_mass", "b_coi1_mass")
-        .Define("b1_score", "b_coi1_score").Define("b1_raw", "b_coi1_raw")
-        .Define("mbb", "mbb_coi").Define("dR_bb", "dR_bb_coi").Define("ptbb", "ptbb_coi")
+        # .Define("b0_idx", "b_coi0_idx").Define("b1_idx", "b_coi1_idx")
+        # .Define("b0_pt", "b_coi0_pt").Define("b0_eta", "b_coi0_eta")
+        # .Define("b0_phi", "b_coi0_phi").Define("b0_mass", "b_coi0_mass")
+        # .Define("b0_score", "b_coi0_score").Define("b0_raw", "b_coi0_raw")
+        # .Define("b1_pt", "b_coi1_pt").Define("b1_eta", "b_coi1_eta")
+        # .Define("b1_phi", "b_coi1_phi").Define("b1_mass", "b_coi1_mass")
+        # .Define("b1_score", "b_coi1_score").Define("b1_raw", "b_coi1_raw")
+        # .Define("mbb", "mbb_coi").Define("dR_bb", "dR_bb_coi").Define("ptbb", "ptbb_coi")
     )
     return df
 

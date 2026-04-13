@@ -31,6 +31,7 @@ class EventLoopResult:
     sig_indices: list
     bkg_indices: list
     h2d_book: dict          # lazy 2D histogram pointers (for plotting)
+    excl_sig_mHH_ptrs: dict # {excl_trig_name: [TH1 ptrs]} for exclusive trigger efficiency
 
 
 def book_and_run(
@@ -128,7 +129,7 @@ def book_and_run(
         sig_mHH_ptrs = [
             mc_sel[s].Histo1D(
                 (f"h_mHH_{s}_{trig_name}",
-                 "m_{HH} gen-level;m_{HH} [GeV];Events", 32, 0, 800),
+                 "m_{HH} gen-level;m_{HH} [GeV];Events", 24, 0, 1200),
                 "gen_mHH", "w")
             for s in sig_samples
         ]
@@ -162,6 +163,21 @@ def book_and_run(
     excl_histo_books = book_exclusive_histograms(
         excl_trig_list, mc_base, plot_vars, active_modes, decay_modes,
         proc_to_samples, unified_ptrs)
+
+    # Book exclusive gen_mHH histograms for signal (trigger efficiency studies)
+    excl_sig_mHH_ptrs = {}
+    for trig_name, trig in excl_trig_list:
+        if trig is None:
+            continue
+        ptrs = [
+            mc_base[s].Filter(trig).Histo1D(
+                (f"h_mHH_{s}_{trig_name}",
+                 "m_{HH} gen-level;m_{HH} [GeV];Events", 24, 0, 1200),
+                "gen_mHH", "w")
+            for s in sig_samples
+        ]
+        unified_ptrs.extend(ptrs)
+        excl_sig_mHH_ptrs[trig_name] = ptrs
 
     # ── Run unified event loop ──
     print(f"\nBooked {len(unified_ptrs)} total actions")
@@ -224,4 +240,5 @@ def book_and_run(
         sig_indices=sig_indices,
         bkg_indices=bkg_indices,
         h2d_book=h2d_hists,
+        excl_sig_mHH_ptrs=excl_sig_mHH_ptrs,
     )
