@@ -132,7 +132,6 @@ def book_and_run(
 
         weighting = "w"
         if (trig_name == "DST_JetHT"): weighting = "finalWeight"
-        print(trig_name)
 
         sig_mHH_ptrs = [
             mc_sel[s].Histo1D(
