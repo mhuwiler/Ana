@@ -112,12 +112,16 @@ def book_and_run(
         print(f"Booking actions for {trig_name} ...")
 
         # Apply trigger filter
+        
         if trig is not None:
             data_sel = data_base.Filter(trig) if data_base is not None else None
             mc_sel = {name: df.Filter(trig) for name, df in mc_base.items()}
         else:
             data_sel = data_base
             mc_sel = dict(mc_base)
+
+        for name, df in mc_sel.items(): 
+            mc_sel[name] = mc_sel[name].Define("prescaleWeight", "prescaleWeight(L1_HTT200er, L1_HTT255er, L1_HTT280er, L1_HTT320er, L1_HTT360er, L1_HTT400er, L1_HTT450er, L1_ETT2000, L1_SingleJet180, L1_SingleJet200, L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5, L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5, L1_DoubleJet30er2p5_Mass_Min330_dEta_Max1p5)").Define("finalWeight", "w*prescaleWeight")
 
         # Apply per-trigger cuts from cuts_by_trig
         trig_cuts = cuts_by_trig.get(trig_name, [])
@@ -130,7 +134,7 @@ def book_and_run(
             mc_sel[s].Histo1D(
                 (f"h_mHH_{s}_{trig_name}",
                  "m_{HH} gen-level;m_{HH} [GeV];Events", 24, 0, 1200),
-                "gen_mHH", "w")
+                "gen_mHH", "finalWeight")
             for s in sig_samples
         ]
         unified_ptrs.extend(sig_mHH_ptrs)
@@ -170,10 +174,10 @@ def book_and_run(
         if trig is None:
             continue
         ptrs = [
-            mc_base[s].Filter(trig).Histo1D(
+            mc_base[s].Filter(trig).Define("prescaleWeight", "prescaleWeight(L1_HTT200er, L1_HTT255er, L1_HTT280er, L1_HTT320er, L1_HTT360er, L1_HTT400er, L1_HTT450er, L1_ETT2000, L1_SingleJet180, L1_SingleJet200, L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5, L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5, L1_DoubleJet30er2p5_Mass_Min330_dEta_Max1p5)").Define("finalWeight", "w*prescaleWeight").Histo1D(
                 (f"h_mHH_{s}_{trig_name}",
                  "m_{HH} gen-level;m_{HH} [GeV];Events", 24, 0, 1200),
-                "gen_mHH", "w")
+                "gen_mHH", "finalWeight")
             for s in sig_samples
         ]
         unified_ptrs.extend(ptrs)
