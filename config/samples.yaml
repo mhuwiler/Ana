@@ -18,7 +18,7 @@ settings:
   max_events: 999_999_999 # HARD CONSTRAINT: Triggered only when MAX_EVENTS = None : effectively no limit
   xcache_prefix: "root://xcache.cms.rcac.purdue.edu/"
   dasgoclient: /cvmfs/cms.cern.ch/common/dasgoclient
-  scouting_data_json: /home/das214/HHtobbtautau/Run3_nano_submission/datasets/Scouting_DATA.json
+  scouting_data_json: /home/das214/HHtobbtautau/Run3_nano_submission/datasets/Scouting_DATA.json #data/Cert_Collisions2024_378981_386951_Golden.json 
 
 
 # ============================================================================

@@ -23,7 +23,7 @@ def _vs_all_at(idx_var, prob_name):
 # ═══════════════════════════════════════════════════════════════════════════════
 
     df = (df
-        .Define("ak4_pt0",  f"ScoutingFPJetReCluster2_pt[0]")
+        .Define("ak4_pt0",  f"ScoutingFPJetReCluster2_pt[0]"))
 
 def define_ak4_jets(df):
     """AK4 jet pT/eta/mass, nJets, HT, MHT, nLeptons, nMuons, nElectrons, centrality."""

@@ -23,7 +23,7 @@ import time
 
 import ROOT
 
-SLIM_DIR = "/depot/cms/users/das214/tmp/slim"
+SLIM_DIR = "/work/users/mhuwiler-cern/tmp/slim"
 
 # Collects all C++ expression strings from r_define/r_filter calls
 rdf_exprs = []
