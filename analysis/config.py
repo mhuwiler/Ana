@@ -102,3 +102,19 @@ def load_triggers(config_dir="config"):
     brilcalc_fallback = cfg.get("brilcalc_fallback", {})
 
     return trig_list, excl_trig_list, brilcalc_files, brilcalc_fallback
+
+
+import ROOT 
+
+
+ROOT.gInterpreter.Declare("""float prescaleWeight(const int L1_HTT200er, const int L1_HTT255er, const int L1_HTT280er, const int L1_HTT320er, const int L1_HTT360er, const int L1_HTT400er, const int L1_HTT450er, const int L1_ETT2000, const int L1_SingleJet180, const int L1_SingleJet200, const int L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5, const int L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5, const int L1_DoubleJet30er2p5_Mass_Min330_dEta_Max1p5) {
+		float weight = 1.; 
+		// If only triggered by L1_HTT200er, which is prescaled by 1600, apply corresponding weight 
+		if (L1_HTT200er && !(L1_HTT255er || L1_HTT280er || L1_HTT320er || L1_HTT360er || L1_HTT400er || L1_HTT450er || L1_ETT2000 || L1_SingleJet180 || L1_SingleJet200 || L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5 || L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5 || L1_DoubleJet30er2p5_Mass_Min330_dEta_Max1p5)) weight = 1./1600.; 
+
+		// If triggered by L1_HTT255er, which is prescaled by 500, and not any seed with lower prescale, apply corresponding weight 
+		if (L1_HTT255er && !(L1_HTT280er || L1_HTT320er || L1_HTT360er || L1_HTT400er || L1_HTT450er || L1_ETT2000 || L1_SingleJet180 || L1_SingleJet200 || L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5 || L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5 || L1_DoubleJet30er2p5_Mass_Min330_dEta_Max1p5)) weight = 1./500.;  
+
+
+		return weight; 
+	}""") 
