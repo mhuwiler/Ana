@@ -60,7 +60,7 @@ def load_macros(ana_dir=None):
     ROOT.gInterpreter.AddIncludePath(ana_dir)
     ROOT.gInterpreter.AddIncludePath(os.path.join(ana_dir, "elements"))
 
-    for macro in ["elements/GenMatching.C", "elements/RecoObjects.C"]:
+    for macro in ["elements/GenMatching.C", "elements/RecoObjects.C", "elements/TriggerEmbedding.C"]:
         so = macro.replace(".C", "_C.so")
         if os.path.exists(so) and os.path.getmtime(so) >= os.path.getmtime(macro):
             ROOT.gROOT.LoadMacro(f"{macro}+")

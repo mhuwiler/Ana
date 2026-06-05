@@ -121,7 +121,7 @@ def book_and_run(
             mc_sel = dict(mc_base)
 
         for name, df in mc_sel.items(): 
-            mc_sel[name] = mc_sel[name].Define("prescaleWeight", "prescaleWeight(L1_HTT200er, L1_HTT255er, L1_HTT280er, L1_HTT320er, L1_HTT360er, L1_HTT400er, L1_HTT450er, L1_ETT2000, L1_SingleJet180, L1_SingleJet200, L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5, L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5, L1_DoubleJet30er2p5_Mass_Min330_dEta_Max1p5)").Define("finalWeight", "w*prescaleWeight")
+            mc_sel[name] = mc_sel[name].Define("prescaleWeight", "Ana::prescaleWeight(L1_HTT200er, L1_HTT255er, L1_HTT280er, L1_HTT320er, L1_HTT360er, L1_HTT400er, L1_HTT450er, L1_ETT2000, L1_SingleJet180, L1_SingleJet200, L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5, L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5, L1_DoubleJet30er2p5_Mass_Min330_dEta_Max1p5)").Define("finalWeight", "w*prescaleWeight")
 
         # Apply per-trigger cuts from cuts_by_trig
         trig_cuts = cuts_by_trig.get(trig_name, [])
